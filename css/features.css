@@ -10,4 +10,56 @@ html.mobile-ui body[data-screen="game"]{overflow:hidden}.mobile-ui #gameScreen{h
 .mobile-ui.keyboard-open .stage{grid-template-rows:minmax(118px,31%) minmax(0,1fr)}.mobile-ui.keyboard-open .ring{width:min(38vw,150px,28vh)}.mobile-ui.keyboard-open .letter{width:19px;font-size:8px}.mobile-ui.keyboard-open .ringCore span{display:none}.mobile-ui.keyboard-open .ringCore b{font-size:34px}.mobile-ui.keyboard-open .question p{font-size:14px}.mobile-ui.keyboard-open .activeCard b{font-size:30px}.mobile-ui.keyboard-open #feedback{display:none}.mobile-ui.keyboard-open .playPanel{grid-template-rows:minmax(0,1fr) auto}.mobile-ui.keyboard-open .answerArea{grid-template-columns:1fr 1fr}.mobile-ui.keyboard-open #answerInput{height:40px}.mobile-ui.keyboard-open .check,.mobile-ui.keyboard-open .pass{min-height:42px}
 .mobile-ui .modeScreen,.mobile-ui .waitingRoom{overflow:auto;align-items:center}.mobile-ui .modeCard{width:100%;padding:18px;border-radius:18px}.mobile-ui .homeCard>img{width:min(48vw,190px)}.mobile-ui .modeBtn,.mobile-ui .install{min-height:54px}.mobile-ui .waitingCard{padding:25px 18px}.mobile-ui .teacherWorkspace{grid-template-columns:1fr;padding:10px}.mobile-ui .teacherPanel header{height:auto;padding:8px 10px}.mobile-ui .teacherQuestionList{grid-template-columns:repeat(7,1fr);max-height:none}.mobile-ui .monitorTable{min-width:650px}.mobile-ui .teacherCode strong{font-size:28px}.mobile-ui .liveBoard>div{padding:19px 14px}.mobile-ui .liveBoard li{font-size:13px}
 @media(max-width:430px){.mobile-ui .stage{grid-template-rows:minmax(190px,39%) minmax(0,1fr)}.mobile-ui .ring{width:min(72vw,285px,35vh)}.mobile-ui .teacherQuestionList{grid-template-columns:repeat(5,1fr)}}
+
+/* Telefon/tablet öğretmen paneli: masaüstü tabloyu yakınlaştırmadan okunabilen kartlara dönüştürür. */
+.mobile-ui body[data-screen="teacher"]{overflow:hidden}
+.mobile-ui .teacherPanel{width:100%;height:var(--app-height);min-height:0;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.mobile-ui .teacherPanel>header{position:sticky;top:0;z-index:20;width:100%;min-height:60px;padding:max(7px,env(safe-area-inset-top)) 10px 7px;gap:8px}
+.mobile-ui .teacherPanel .brand{min-width:0;font-size:clamp(12px,3.2vw,17px);line-height:1.15}
+.mobile-ui .teacherPanel .brand>span{min-width:0}
+.mobile-ui .teacherPanel .brand #teacherTitle{display:block;white-space:normal}
+.mobile-ui .teacherPanel .headerLogo{flex:0 0 42px;width:42px;height:42px;margin-right:7px}
+.mobile-ui #teacherHome{flex:0 0 auto;min-height:42px;padding:8px 10px;font-size:11px}
+.mobile-ui .teacherWorkspace{display:grid;grid-template-columns:minmax(0,1fr);width:100%;max-width:820px;gap:10px;padding:10px;margin:0 auto}
+.mobile-ui .teacherSetup,.mobile-ui .monitorArea{width:100%;min-width:0;padding:14px;border-radius:12px}
+.mobile-ui .teacherCode{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"label copy" "code copy";align-items:center;gap:2px 10px;padding:12px}
+.mobile-ui .teacherCode small{grid-area:label;text-align:left}
+.mobile-ui .teacherCode strong{grid-area:code;min-width:0;margin:2px 0;text-align:left;font-size:clamp(25px,8vw,36px);letter-spacing:.13em;overflow-wrap:anywhere}
+.mobile-ui .teacherCode .quiet{grid-area:copy;min-height:44px;padding:8px 10px;font-size:11px}
+.mobile-ui .teacherSetup>label{margin:11px 0;font-size:14px}
+.mobile-ui #teacherDuration{height:48px;margin-top:5px;padding:9px 12px;font-size:17px}
+.mobile-ui .teacherSetup fieldset{min-width:0;margin:10px 0;padding:10px}
+.mobile-ui .teacherQuestionList{grid-template-columns:repeat(auto-fit,minmax(42px,1fr));gap:6px;width:100%;max-height:none}
+.mobile-ui .teacherQuestionList label{min-width:0;min-height:46px;padding:5px 2px;font-size:13px}
+.mobile-ui .teacherQuestionList input{width:19px;height:19px}
+.mobile-ui .teacherStart,.mobile-ui .teacherFinish{min-height:54px;margin-top:8px;font-size:14px}
+.mobile-ui .teacherSetup #teacherStatus{margin:11px 0 0;font-size:13px;line-height:1.35}
+.mobile-ui .monitorHead{gap:8px;padding-bottom:10px}
+.mobile-ui .monitorHead h2{font-size:20px}
+.mobile-ui .monitorHead>strong{flex:0 0 auto;padding:7px 9px;font-size:12px}
+.mobile-ui .monitorTableWrap{width:100%;overflow:visible}
+.mobile-ui .monitorTable{display:block;width:100%;min-width:0;border:0}
+.mobile-ui .monitorTable thead{display:none}
+.mobile-ui .monitorTable tbody{display:grid;width:100%;gap:9px;padding-top:10px}
+.mobile-ui .monitorTable tr{display:grid;width:100%;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;padding:11px;background:#f5f8fb;border:1px solid #d8e2eb;border-left:4px solid var(--rail-blue);border-radius:11px}
+.mobile-ui .monitorTable td{display:flex;min-width:0;align-items:center;justify-content:space-between;gap:8px;padding:7px 8px;border:0;background:#fff;border-radius:7px;text-align:right;overflow-wrap:anywhere}
+.mobile-ui .monitorTable td::before{content:attr(data-label);flex:0 0 auto;color:#64798d;font-size:10px;font-weight:900;letter-spacing:.05em;text-transform:uppercase}
+.mobile-ui .monitorTable td:first-child{grid-column:1/-1;font-size:16px;text-align:left}
+.mobile-ui .monitorTable td:first-child b{max-width:100%;overflow-wrap:anywhere}
+.mobile-ui .monitorTable .studentStatus{white-space:normal;text-align:center}
+.mobile-ui .monitorTable .emptyTeacherRow{display:block;padding:0;border-left-width:1px;background:#f5f8fb}
+.mobile-ui .monitorTable .emptyTeacherRow td{display:block;padding:18px 12px;text-align:center;background:transparent}
+.mobile-ui .monitorTable .emptyTeacherRow td::before{content:none}
+
+@media(max-width:430px){
+  .mobile-ui .teacherWorkspace{padding:8px;gap:8px}
+  .mobile-ui .teacherSetup,.mobile-ui .monitorArea{padding:11px}
+  .mobile-ui .teacherPanel .brand{font-size:12px}
+  .mobile-ui .teacherPanel .brand small{font-size:8px}
+  .mobile-ui .teacherCode strong{font-size:25px;letter-spacing:.1em}
+  .mobile-ui .teacherQuestionList{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .mobile-ui .monitorTable tr{padding:8px;gap:6px}
+  .mobile-ui .monitorTable td{padding:7px 6px;font-size:13px}
+  .mobile-ui .monitorTable td::before{font-size:9px}
+}
 @media(prefers-reduced-motion:reduce){.splash img,.spinner,.livePulse:before,.waitingDots i{animation-duration:.01ms!important}.splash{transition-duration:.01ms}}

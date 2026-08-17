@@ -22,7 +22,8 @@ assert(features.includes("'.info/serverTimeOffset'"), 'Sayaç Firebase sunucu sa
 assert(app.includes("gameMode !== 'offline'") && html.includes('class="gameControls offlineOnly"'), 'Online öğrenci durdurma kontrolleri kapalı olmalı');
 assert(css.includes('--gold:#ffcc00') && css.includes('.letter.passed{background:var(--gold)!important'), 'PAS harfi #FFCC00 olmalı');
 assert(css.includes('html.mobile-ui body[data-screen="game"]{overflow:hidden}'), 'Mobil oyun ekranında taşma engellenmeli');
+assert(css.includes('.mobile-ui .monitorTable thead{display:none}') && features.includes('data-label="Kalan süre"'), 'Mobil öğretmen tablosu yakınlaştırma gerektirmeyen kart düzeninde olmalı');
 assert(manifest.display_override.includes('fullscreen') && manifest.icons.some(icon => icon.sizes === '192x192') && manifest.icons.some(icon => icon.sizes === '512x512'), 'PWA tam ekran ve logo simgeleri tanımlı olmalı');
 assert(rules.rules.rooms.$room.players.$player['.write'].includes('$player === auth.uid'), 'Öğrenci yalnızca kendi canlı kaydını yazabilmeli');
 
-console.log('11/11 arayüz ve online sözleşme testi başarılı');
+console.log('12/12 arayüz ve online sözleşme testi başarılı');

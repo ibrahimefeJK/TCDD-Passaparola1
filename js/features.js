@@ -178,8 +178,8 @@
     var players = playerArray(room.players); $('connectedCount').textContent = players.length + ' öğrenci';
     $('teacherPlayers').innerHTML = players.map(function (entry) {
       var status = entry.status || 'waiting'; var labels = { waiting: 'Bekliyor', playing: 'Yarışıyor', finished: 'Tamamladı', disconnected: 'Bağlantı kesildi' };
-      return '<tr><td><b>' + escapeHtml(entry.name || 'İsimsiz') + '</b></td><td><span class="studentStatus ' + status + '">' + (labels[status] || status) + '</span></td><td><b>' + (entry.score || 0) + '</b></td><td>' + escapeHtml(entry.currentLetter || '—') + '</td><td>' + window.PassaparolaApp.format(entry.remainingSeconds == null ? room.settings.durationSeconds : entry.remainingSeconds) + '</td></tr>';
-    }).join('') || '<tr><td colspan="5">Henüz öğrenci katılmadı.</td></tr>';
+      return '<tr><td data-label="Öğrenci"><b>' + escapeHtml(entry.name || 'İsimsiz') + '</b></td><td data-label="Durum"><span class="studentStatus ' + status + '">' + (labels[status] || status) + '</span></td><td data-label="Puan"><b>' + (entry.score || 0) + '</b></td><td data-label="Aktif harf">' + escapeHtml(entry.currentLetter || '—') + '</td><td data-label="Kalan süre">' + window.PassaparolaApp.format(entry.remainingSeconds == null ? room.settings.durationSeconds : entry.remainingSeconds) + '</td></tr>';
+    }).join('') || '<tr class="emptyTeacherRow"><td colspan="5">Henüz öğrenci katılmadı.</td></tr>';
     if (room.status === 'running') {
       $('teacherStart').classList.add('hidden'); $('teacherFinish').classList.remove('hidden'); $('teacherDuration').disabled = true;
       $('teacherQuestionList').querySelectorAll('input').forEach(function (input) { input.disabled = true; });
