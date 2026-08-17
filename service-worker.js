@@ -1,4 +1,4 @@
-const CACHE = 'tcdd-passaparola-v9';
+const CACHE = 'tcdd-passaparola-v10';
 const ASSETS = [
   './', './index.html', './about.html', './manifest.webmanifest',
   './css/style.css', './css/features.css', './css/about.css',

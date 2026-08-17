@@ -62,4 +62,53 @@ html.mobile-ui body[data-screen="game"]{overflow:hidden}.mobile-ui #gameScreen{h
   .mobile-ui .monitorTable td{padding:7px 6px;font-size:13px}
   .mobile-ui .monitorTable td::before{font-size:9px}
 }
+
+/* Mobil uygulamanın tüm sekmeleri ve klavye açıkken oyun yüzeyi. */
+.mobile-ui, .mobile-ui body{max-width:100%;overflow-x:hidden;-webkit-text-size-adjust:100%;}
+.mobile-ui .modeScreen,.mobile-ui .waitingRoom,.mobile-ui .liveBoard{width:100%;max-width:100vw;overflow-x:hidden;}
+.mobile-ui .modeCard,.mobile-ui .waitingCard{max-width:calc(100vw - 20px);}
+.mobile-ui .liveBoard{overflow-y:auto;align-items:start;padding:max(10px,env(safe-area-inset-top)) 10px max(10px,env(safe-area-inset-bottom));}
+.mobile-ui .liveBoard>div{width:100%;max-width:650px;max-height:calc(var(--app-height) - 20px);padding:16px 12px;overflow:auto;}
+.mobile-ui .liveBoard li{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;overflow-wrap:anywhere;}
+.mobile-ui .admin{height:var(--app-height);min-height:0;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.mobile-ui .admin>header{position:sticky;top:0;z-index:20;height:auto;min-height:60px;padding:max(7px,env(safe-area-inset-top)) 10px 7px;gap:8px;}
+.mobile-ui .admin>header .brand{min-width:0;font-size:13px;}
+.mobile-ui .admin>header .brand>span{min-width:0;overflow-wrap:anywhere;}
+.mobile-ui .admin>header .quiet{flex:0 0 auto;min-height:42px;padding:8px 10px;font-size:10px;}
+.mobile-ui .admin nav{position:sticky;top:60px;z-index:19;padding:8px;gap:5px;}
+.mobile-ui .admin nav button{min-height:42px;padding:9px 10px;font-size:11px;}
+.mobile-ui .admin #adminContent{width:100%;max-width:100%;padding:10px 8px;overflow-x:hidden;}
+.mobile-ui .admin .card{padding:13px;border-radius:10px;}
+.mobile-ui .admin .formGrid{grid-template-columns:1fr;gap:8px;}
+.mobile-ui .admin .letterAccordion summary{grid-template-columns:42px minmax(0,1fr);gap:8px;padding:11px 10px;}
+.mobile-ui .admin .letterAccordion summary>span:nth-child(2){min-width:0;overflow-wrap:anywhere;}
+.mobile-ui .admin .letterEnable{grid-column:1/-1;min-height:36px;}
+.mobile-ui .admin .letterAccordionBody{padding:10px;}
+.mobile-ui .admin .poolItem{padding:10px;margin:8px 0;}
+.mobile-ui .admin .poolItem textarea{min-height:76px;resize:vertical;}
+
+/* Klavye açıldığında üst bilgi alanları yer kaplamaz; soru ve iki işlem düğmesi görünür kalır. */
+.mobile-ui.keyboard-open #gameScreen{height:var(--app-height);min-height:0;}
+.mobile-ui.keyboard-open #gameScreen>header{height:0;min-height:0;padding:0;border:0;overflow:hidden;}
+.mobile-ui.keyboard-open #gameScreen>.scorebar{display:none;}
+.mobile-ui.keyboard-open #gameScreen>.stage{height:var(--app-height);flex:1;grid-template-rows:minmax(84px,24%) minmax(0,1fr);gap:4px;padding:4px 8px max(4px,env(safe-area-inset-bottom));}
+.mobile-ui.keyboard-open .ring{width:min(30vw,112px,21vh);}
+.mobile-ui.keyboard-open .letter{width:18px;font-size:8px;}
+.mobile-ui.keyboard-open .ringCore{inset:25%;}
+.mobile-ui.keyboard-open .ringCore span{display:none;}
+.mobile-ui.keyboard-open .ringCore b{font-size:30px;}
+.mobile-ui.keyboard-open .playPanel{gap:3px;grid-template-rows:minmax(0,1fr) auto;overflow:hidden;}
+.mobile-ui.keyboard-open .questionHead{grid-template-columns:42px minmax(0,1fr);gap:4px;min-height:0;}
+.mobile-ui.keyboard-open .activeCard,.mobile-ui.keyboard-open .question{padding:6px;border-radius:7px;overflow:hidden;}
+.mobile-ui.keyboard-open .activeCard small,.mobile-ui.keyboard-open .question small{font-size:8px;}
+.mobile-ui.keyboard-open .activeCard b{font-size:26px;}
+.mobile-ui.keyboard-open .question p{display:-webkit-box;margin:3px 0;font-size:12px;line-height:1.15;overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:3;}
+.mobile-ui.keyboard-open #feedback{display:none;min-height:0;}
+.mobile-ui.keyboard-open .answerArea{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px;min-height:0;}
+.mobile-ui.keyboard-open .answerArea label{font-size:8px;line-height:1;}
+.mobile-ui.keyboard-open #answerInput{height:38px;margin-top:2px;padding:6px;font-size:16px;}
+.mobile-ui.keyboard-open .check,.mobile-ui.keyboard-open .pass{min-height:40px;height:40px;padding:4px;font-size:11px;}
+.mobile-ui.keyboard-open .pass b{font-size:12px;}
+.mobile-ui.keyboard-open .pass span{font-size:7px;}
+
 @media(prefers-reduced-motion:reduce){.splash img,.spinner,.livePulse:before,.waitingDots i{animation-duration:.01ms!important}.splash{transition-duration:.01ms}}
