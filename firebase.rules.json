@@ -1,1 +1,17 @@
-{"rules":{"rooms":{"$room":{".read":"auth != null",".write":"auth != null && ((!data.exists() && newData.child('teacherUid').val() === auth.uid) || data.child('teacherUid').val() === auth.uid)","players":{"$player":{".write":"auth != null && ($player === auth.uid || root.child('rooms').child($room).child('teacherUid').val() === auth.uid)"}}}}}}
+{
+  "rules": {
+    "rooms": {
+      "$room": {
+        ".read": "auth != null",
+        ".write": "auth != null && ((!data.exists() && newData.child('teacherUid').val() === auth.uid) || data.child('teacherUid').val() === auth.uid)",
+        ".validate": "!newData.exists() || (newData.hasChild('teacherUid') && newData.hasChild('status') && (newData.child('status').val() === 'waiting' || newData.child('status').val() === 'running' || newData.child('status').val() === 'finished' || newData.child('status').val() === 'test'))",
+        "players": {
+          "$player": {
+            ".write": "auth != null && ($player === auth.uid || root.child('rooms').child($room).child('teacherUid').val() === auth.uid)",
+            ".validate": "!newData.exists() || (newData.hasChild('name') && newData.child('name').isString() && newData.child('name').val().length <= 60)"
+          }
+        }
+      }
+    }
+  }
+}

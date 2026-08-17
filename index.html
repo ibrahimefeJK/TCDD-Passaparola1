@@ -1,12 +1,157 @@
 <!doctype html>
-<html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#071426"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Passaparola"><title>TCDD Eğitim Merkezi – Passaparola</title><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="assets/favicon.png"><link rel="apple-touch-icon" href="assets/logo192.png"><link rel="stylesheet" href="css/style.css"><link rel="stylesheet" href="css/features.css"><script defer src="js/defaultQuestions.js"></script><script defer src="js/storage.js"></script><script defer src="js/gameEngine.js"></script><script defer src="js/app.js"></script><script defer src="js/features.js"></script></head><body>
-<div id="splash" class="splash"><div class="splashInner"><img src="assets/logo512.png" alt="TCDD Passaparola Yarışması"><div class="spinner" aria-label="Uygulama yükleniyor"></div><p>Yarışma hazırlanıyor…</p></div></div>
-<section id="modeScreen" class="modeScreen hidden"><div class="modeCard"><img src="assets/logo512.png" alt="TCDD Passaparola"><h1>Nasıl oynamak istersiniz?</h1><button id="offlineMode" class="modeBtn">ÇEVRİMDIŞI OYNA</button><button id="onlineMode" class="modeBtn online">ÇEVRİMİÇİ (ONLINE) OYNA</button><button id="installBtn" class="install hidden">UYGULAMAYI TELEFONA YÜKLE / ANA SAYFAYA EKLE</button><button id="iosHelp" class="install hidden">iPhone / iPad’e Kurulum Bilgisi</button><button id="aboutBtn" class="textBtn">HAKKIMIZDA</button></div></section>
-<section id="onlineLobby" class="modeScreen hidden"><div class="modeCard lobby"><img src="assets/logo192.png" alt="TCDD Passaparola"><h1>Çevrimiçi Oda</h1><label>Adınız<input id="onlineName" maxlength="60" autocomplete="name"></label><label>Oda Katılım Kodu<input id="joinCode" maxlength="6" inputmode="numeric" autocomplete="off"></label><button id="joinRoom" class="modeBtn online">ODAYA KATIL</button><button id="backModes" class="textBtn">GERİ DÖN</button><p id="onlineStatus" role="status"></p></div><button id="createRoom" class="createRoom">＋ ODA OLUŞTUR</button></section>
-<main id="gameScreen" class="hidden"><header><div class="brand"><img class="headerLogo" src="assets/logo192.png" alt="Passaparola logosu"><span><span id="title">TCDD EĞİTİM MERKEZİ</span><small id="subtitle">PASSAPAROLA YARIŞMASI</small></span></div><div class="tools"><button id="adminBtn" class="quiet">YÖNETİM</button><button id="fullBtn" class="quiet">TAM EKRAN</button></div></header>
-<section class="scorebar"><div class="gameControls"><button id="startBtn" class="start">▶ BAŞLAT</button><button id="resetBtn" class="resetSmall hidden">SIFIRLA</button></div><div><small>YARIŞMACI</small><strong id="player">—</strong></div><div><small>PUAN</small><strong id="score">0</strong></div><div><small>KALAN SÜRE</small><strong id="timer">04:00</strong></div></section>
-<section class="stage"><div id="ring" class="ring" aria-label="Passaparola harf çemberi"><div class="ringCore"><span>AKTİF HARF</span><b id="activeLetter">—</b></div></div><div class="playPanel"><div class="questionHead"><div class="activeCard"><small>AKTİF HARF</small><b id="activeLetter2">—</b></div><div class="question"><small>SORU</small><p id="questionText">Yarışmaya başlamak için BAŞLAT düğmesine basın.</p></div></div><div id="feedback" role="status"></div><div class="answerArea"><label>CEVABINIZ<input id="answerInput" autocomplete="off" disabled></label><button id="checkBtn" class="check" disabled>CEVABI KONTROL ET</button><button id="passBtn" class="pass" disabled><b>PAS</b><span>SIRADAKİ SORU</span></button></div></div></section></main>
-<section id="adminScreen" class="admin hidden"><header><div class="brand"><img class="headerLogo" src="assets/logo192.png" alt="Logo"><span>YÖNETİM PANELİ<small>TCDD PASSAPAROLA</small></span></div><button id="closeAdmin" class="quiet">YARIŞMAYA DÖN</button></header><nav><button data-tab="settings" class="selected">GENEL AYARLAR</button><button data-tab="questions">SORU BANKASI</button><button data-tab="leaders">LİDERLİK</button><button data-tab="backup">YEDEKLEME</button></nav><div id="adminContent"></div></section>
-<div id="liveBoard" class="liveBoard hidden"><div><button id="closeLive" aria-label="Kapat">×</button><h2>CANLI LİDERLİK TABLOSU</h2><p id="roomLabel"></p><ol id="livePlayers"></ol></div></div>
-<div id="modal" class="modal hidden" role="dialog" aria-modal="true"><div class="modalBox"><button id="modalClose" class="x" aria-label="Kapat">×</button><div id="modalBody"></div></div></div><div id="toast" role="status"></div>
-<script src="firebase-config.js"></script></body></html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#071426">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Passaparola">
+  <title>TCDD Eğitim Merkezi – Passaparola</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/favicon.ico" sizes="any">
+  <link rel="icon" href="assets/favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="assets/logo192.png">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/features.css">
+  <script defer src="js/defaultQuestions.js"></script>
+  <script defer src="js/storage.js"></script>
+  <script defer src="js/gameEngine.js"></script>
+  <script defer src="js/app.js"></script>
+  <script defer src="js/features.js"></script>
+</head>
+<body>
+  <div id="splash" class="splash" aria-label="Uygulama açılış ekranı">
+    <div class="splashInner">
+      <img src="assets/logo512.png" alt="TCDD Passaparola Yarışması">
+      <div class="spinner" aria-label="Uygulama yükleniyor"></div>
+      <p>Yarışma hazırlanıyor…</p>
+    </div>
+  </div>
+
+  <section id="modeScreen" class="modeScreen hidden" aria-labelledby="homeTitle">
+    <div class="modeCard homeCard">
+      <img src="assets/logo512.png" alt="TCDD Passaparola">
+      <h1 id="homeTitle">Nasıl oynamak istersiniz?</h1>
+      <button id="offlineMode" class="modeBtn">ÇEVRİMDIŞI OYNA</button>
+      <button id="onlineMode" class="modeBtn online">ÇEVRİMİÇİ (ONLINE) OYNA</button>
+      <button id="homeAdminBtn" class="modeBtn adminEntry">YÖNETİM PANELİ</button>
+      <button id="installBtn" class="install hidden">UYGULAMAYI TELEFONA YÜKLE / ANA SAYFAYA EKLE</button>
+      <button id="iosHelp" class="install hidden">iPhone / iPad’e Kurulum Bilgisi</button>
+      <button id="aboutBtn" class="textBtn">HAKKIMIZDA</button>
+    </div>
+  </section>
+
+  <section id="onlineLobby" class="modeScreen hidden" aria-labelledby="lobbyTitle">
+    <div class="modeCard lobby">
+      <img src="assets/logo192.png" alt="TCDD Passaparola">
+      <h1 id="lobbyTitle">Çevrimiçi Oda</h1>
+      <label>Adınız
+        <input id="onlineName" maxlength="60" autocomplete="name" placeholder="Adınızı yazın">
+      </label>
+      <label>Oda Katılım Kodu
+        <input id="joinCode" maxlength="6" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" placeholder="6 haneli kod">
+      </label>
+      <button id="joinRoom" class="modeBtn online">ODAYA KATIL</button>
+      <button id="createRoom" class="modeBtn teacher">ÖĞRETMEN ODASI OLUŞTUR</button>
+      <button id="backModes" class="textBtn">GERİ DÖN</button>
+      <p id="onlineStatus" role="status" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <section id="waitingRoom" class="waitingRoom hidden" aria-labelledby="waitingTitle">
+    <div class="waitingCard">
+      <img src="assets/logo192.png" alt="TCDD Passaparola">
+      <span class="livePulse">CANLI ODA</span>
+      <h1 id="waitingTitle">Öğretmen Bekleniyor…</h1>
+      <p>Yarışma birazdan başlayacak.</p>
+      <div class="roomCodeBox"><small>ODA KODU</small><strong id="waitingCode">------</strong></div>
+      <p id="waitingName" class="waitingName"></p>
+      <div class="waitingDots" aria-hidden="true"><i></i><i></i><i></i></div>
+      <button id="leaveWaiting" class="textBtn">ODADAN AYRIL</button>
+    </div>
+  </section>
+
+  <section id="teacherPanel" class="teacherPanel hidden" aria-labelledby="teacherTitle">
+    <header>
+      <div class="brand">
+        <img class="headerLogo" src="assets/logo192.png" alt="TCDD Passaparola logosu">
+        <span><span id="teacherTitle">ÖĞRETMEN İZLEME PANELİ</span><small>TCDD PASSAPAROLA</small></span>
+      </div>
+      <button id="teacherHome" class="quiet">ANA SAYFA</button>
+    </header>
+    <div class="teacherWorkspace">
+      <aside class="teacherSetup">
+        <div class="teacherCode"><small>ODA KATILIM KODU</small><strong id="teacherRoomCode">------</strong><button id="copyRoomCode" class="quiet">KODU KOPYALA</button></div>
+        <label>Yarışma Süresi (saniye)
+          <input id="teacherDuration" type="number" min="10" max="3600" value="240">
+        </label>
+        <fieldset>
+          <legend>Sorulacak Harfler</legend>
+          <div id="teacherQuestionList" class="teacherQuestionList"></div>
+        </fieldset>
+        <button id="teacherStart" class="action teacherStart">YARIŞMAYI BAŞLAT</button>
+        <button id="teacherFinish" class="danger hidden">YARIŞMAYI BİTİR</button>
+        <p id="teacherStatus" role="status" aria-live="polite">Öğrenciler bekleniyor.</p>
+      </aside>
+      <main class="monitorArea">
+        <div class="monitorHead"><div><small>CANLI DURUM</small><h2>Yarışmacılar</h2></div><strong id="connectedCount">0 öğrenci</strong></div>
+        <div class="monitorTableWrap">
+          <table class="monitorTable">
+            <thead><tr><th>ÖĞRENCİ</th><th>DURUM</th><th>PUAN</th><th>AKTİF HARF</th><th>KALAN SÜRE</th></tr></thead>
+            <tbody id="teacherPlayers"><tr><td colspan="5">Henüz öğrenci katılmadı.</td></tr></tbody>
+          </table>
+        </div>
+      </main>
+    </div>
+  </section>
+
+  <main id="gameScreen" class="hidden">
+    <header>
+      <div class="brand">
+        <img class="headerLogo" src="assets/logo192.png" alt="Passaparola logosu">
+        <span><span id="title">TCDD EĞİTİM MERKEZİ</span><small id="subtitle">PASSAPAROLA YARIŞMASI</small></span>
+      </div>
+      <div class="tools"><button id="fullBtn" class="quiet">TAM EKRAN</button><button id="gameHome" class="quiet">ANA SAYFA</button></div>
+    </header>
+    <section class="scorebar">
+      <div class="gameControls offlineOnly"><button id="startBtn" class="start">▶ BAŞLAT</button><button id="resetBtn" class="resetSmall hidden">SIFIRLA</button></div>
+      <div><small>YARIŞMACI</small><strong id="player">—</strong></div>
+      <div><small>PUAN</small><strong id="score">0</strong></div>
+      <div><small>KALAN SÜRE</small><strong id="timer">04:00</strong></div>
+    </section>
+    <section class="stage">
+      <div id="ring" class="ring" aria-label="Passaparola harf çemberi"><div class="ringCore"><span>AKTİF HARF</span><b id="activeLetter">—</b></div></div>
+      <div class="playPanel">
+        <div class="questionHead">
+          <div class="activeCard"><small>AKTİF HARF</small><b id="activeLetter2">—</b></div>
+          <div class="question"><small>SORU</small><p id="questionText">Yarışmaya başlamak için BAŞLAT düğmesine basın.</p></div>
+        </div>
+        <div id="feedback" role="status" aria-live="assertive"></div>
+        <div class="answerArea">
+          <label>CEVABINIZ<input id="answerInput" autocomplete="off" autocapitalize="sentences" enterkeyhint="done" disabled></label>
+          <button id="checkBtn" class="check" disabled>CEVABI KONTROL ET</button>
+          <button id="passBtn" class="pass" disabled><b>PAS GEÇME</b><span>SIRADAKİ SORU</span></button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <section id="adminScreen" class="admin hidden">
+    <header>
+      <div class="brand"><img class="headerLogo" src="assets/logo192.png" alt="Logo"><span>YÖNETİM PANELİ<small>TCDD PASSAPAROLA</small></span></div>
+      <button id="closeAdmin" class="quiet">ANA SAYFAYA DÖN</button>
+    </header>
+    <nav><button data-tab="settings" class="selected">GENEL AYARLAR</button><button data-tab="questions">SORU BANKASI</button><button data-tab="leaders">LİDERLİK</button><button data-tab="backup">YEDEKLEME</button></nav>
+    <div id="adminContent"></div>
+  </section>
+
+  <div id="liveBoard" class="liveBoard hidden">
+    <div><button id="closeLive" aria-label="Kapat">×</button><h2>LİDERLİK SIRALAMASI</h2><p id="roomLabel"></p><ol id="livePlayers"></ol><button id="leaderHome" class="action">ANA SAYFAYA DÖN</button></div>
+  </div>
+  <div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modalBox"><button id="modalClose" class="x" aria-label="Kapat">×</button><div id="modalBody"></div></div></div>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="firebase-config.js"></script>
+</body>
+</html>

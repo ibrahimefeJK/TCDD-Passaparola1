@@ -1,39 +1,327 @@
-(function(){'use strict';var D=PassaparolaDefaults,S=PassaparolaStorage,E=PassaparolaEngine.Engine,data=S.load(),engine=new E(),timerId=null,endAt=0,startedAt=0,stoppedAt=0,pausedRemaining=0,player='',locked=false,recorded=false,stopped=false,tab='settings';
-var $=function(id){return document.getElementById(id);};function esc(s){var d=document.createElement('div');d.textContent=String(s);return d.innerHTML;}function toast(s){$('toast').textContent=s;$('toast').className='show';setTimeout(function(){$('toast').className='';},1800);}function modal(html){$('modalBody').innerHTML=html;$('modal').classList.remove('hidden');}function closeModal(){$('modal').classList.add('hidden');}function validQuestions(){return PassaparolaEngine.activeQuestions(data.questions);}
-function applySettings(){$('title').textContent=data.settings.title;$('subtitle').textContent=data.settings.subtitle;document.title=data.settings.title+' – '+data.settings.subtitle;$('timer').textContent=format(data.settings.durationSeconds);}function format(n){n=Math.max(0,Number(n)||0);return String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');}
-function buildRing(){$('ring').querySelectorAll('.letter').forEach(function(x){x.remove();});D.letters.forEach(function(l,i){var b=document.createElement('div'),angle=(-90+i*360/D.letters.length)*Math.PI/180;b.className='letter';b.dataset.letter=l;b.textContent=l;b.style.left=(50+43*Math.cos(angle))+'%';b.style.top=(50+43*Math.sin(angle))+'%';$('ring').appendChild(b);});renderRing();}
-function renderRing(){var activeMap={};validQuestions().forEach(function(q){activeMap[q.letter]=true;});D.letters.forEach(function(l){var el=document.querySelector('.letter[data-letter="'+l+'"]'),status=engine.status[l]||'idle';el.className='letter '+status+(activeMap[l]?'':' empty');var names={idle:'bekliyor',active:'aktif soru',correct:'doğru cevaplandı',wrong:'yanlış cevaplandı',passed:'pas geçildi'};el.setAttribute('aria-label',l+' harfi – '+names[status]);});}
-function setControls(on){$('answerInput').disabled=!on;$('checkBtn').disabled=!on;$('passBtn').disabled=!on;if(on){$('answerInput').value='';$('answerInput').focus();}}
-function showCurrent(){var q=engine.current,l=q?q.letter:'—';$('activeLetter').textContent=l;$('activeLetter2').textContent=l;$('questionText').textContent=q?q.question:'Yarışma tamamlandı.';$('score').textContent=engine.score;renderRing();setControls(engine.running&&!locked);}
-function startDialog(){if(engine.running){toast('Oyun zaten devam ediyor.');return;}if(!validQuestions().length){modal('<h2>OYUN BAŞLATILAMIYOR</h2><p>Yönetim Paneli\'nden en az bir aktif soru oluşturunuz.</p>');return;}modal('<h2>YARIŞMAYA HAZIR MISINIZ?</h2><label>YARIŞMACI ADI<input id="playerName" maxlength="60" autofocus></label><button class="action" id="beginGame">OYUNU BAŞLAT</button>');setTimeout(function(){$('playerName').focus();$('beginGame').onclick=begin;},0);}
-function begin(){var n=$('playerName').value.trim();if(!n){toast('Yarışmacı adı zorunludur.');return;}player=n;recorded=false;locked=false;stopped=false;engine.start(data.questions);$('player').textContent=player;$('feedback').textContent='';setGameButton('running');closeModal();showCurrent();startTimer();}
-function startTimer(){stopTimer();startedAt=Date.now();endAt=startedAt+Math.max(10,Number(data.settings.durationSeconds)||240)*1000;tick();timerId=setInterval(tick,1000);}function stopTimer(){if(timerId){clearInterval(timerId);timerId=null;}}function tick(){var n=Math.max(0,Math.ceil((endAt-Date.now())/1000));$('timer').textContent=format(n);$('timer').classList.toggle('urgent',data.settings.lastThirtyWarning&&n<=30);if(n<=0)finish('Süre doldu');}
-function act(kind){if(!engine.running||locked)return;locked=true;setControls(false);var q=engine.current,result;if(kind==='pass'){result=engine.resolve('passed');feedback('PAS','bad');}else{var value=$('answerInput').value;if(!value.trim()){locked=false;setControls(true);toast('Lütfen bir cevap girin.');return;}result=engine.answer(value);feedback(result.correct?'DOĞRU':'YANLIŞ',result.correct?'ok':'bad');}showCurrent();setTimeout(function(){locked=false;if(result.ended)finish('Tamamlandı');else showCurrent();},500);}
-function feedback(t,c){$('feedback').textContent=t;$('feedback').className=c;}function finish(reason){if(!engine.running&&recorded)return;engine.running=false;stopTimer();setControls(false);var used=Math.max(0,Math.round((Date.now()-startedAt)/1000));if(!recorded){data.leaderboard.push({id:Date.now()+'_'+Math.random().toString(36).slice(2),playerName:player,score:engine.score,totalQuestions:engine.questions.length,correct:engine.correct,wrong:engine.wrong,usedSeconds:used,finishReason:reason,playedAt:new Date().toISOString()});S.save(data);recorded=true;}renderRing();modal('<h2>'+(reason==='Süre doldu'?'SÜRE DOLDU!':'OYUN TAMAMLANDI')+'</h2><p><b>Yarışmacı:</b> '+esc(player)+'</p><p><b>Doğru:</b> '+engine.correct+' &nbsp; <b>Yanlış:</b> '+engine.wrong+' &nbsp; <b>Puan:</b> '+engine.score+'</p><button class="action" id="newGame">YENİ OYUN</button><button class="action" id="showLeaders">LİDERLİK</button>');setTimeout(function(){$('newGame').onclick=function(){closeModal();resetGame();startDialog();};$('showLeaders').onclick=function(){closeModal();openAdmin('leaders',true);};},0);}
-function setGameButton(state){var b=$('startBtn');b.classList.toggle('stopped',state==='stopped');b.disabled=false;b.textContent=state==='running'?'■ DURDUR':state==='stopped'?'▶ DEVAM ET':'▶ BAŞLAT';$('resetBtn').classList.toggle('hidden',state!=='stopped');}
-function stopGame(){if(!engine.running||stopped)return;pausedRemaining=Math.max(0,Math.ceil((endAt-Date.now())/1000));stoppedAt=Date.now();stopTimer();stopped=true;locked=true;setControls(false);setGameButton('stopped');feedback('OYUN DURDURULDU – Devam edebilir veya yarışmayı sıfırlayabilirsiniz.','bad');toast('Oyun ve süre durduruldu.');}
-function resumeGame(){if(!engine.running||!stopped)return;startedAt+=Date.now()-stoppedAt;endAt=Date.now()+pausedRemaining*1000;stopped=false;locked=false;setGameButton('running');feedback('OYUN DEVAM EDİYOR','ok');showCurrent();tick();timerId=setInterval(tick,1000);}
-function resetGame(){stopTimer();engine.reset();player='';locked=false;recorded=false;stopped=false;$('player').textContent='—';$('score').textContent='0';$('feedback').textContent='';$('questionText').textContent='Yarışmaya başlamak için BAŞLAT düğmesine basın.';$('activeLetter').textContent=$('activeLetter2').textContent='—';$('timer').textContent=format(data.settings.durationSeconds);setGameButton('idle');renderRing();setControls(false);}
-function pinAdmin(){if(engine.running&&!stopped){toast('Oyun devam ederken yönetim paneli açılamaz. Önce oyunu durdurun.');return;}modal('<h2>YÖNETİM GİRİŞİ</h2><label>PIN<input id="pin" type="password" inputmode="numeric"></label><button id="pinGo" class="action">GİRİŞ</button>');setTimeout(function(){$('pinGo').onclick=function(){if($('pin').value===String(data.settings.adminPin)){closeModal();openAdmin('settings');}else toast('PIN hatalı.');};},0);}
-function openAdmin(t,bypass){if(engine.running&&!stopped&&!bypass){toast('Oyun devam ederken soru bankası değiştirilemez.');return;}tab=t||tab;$('gameScreen').classList.add('hidden');$('adminScreen').classList.remove('hidden');renderAdmin();}
-function activeCount(){return validQuestions().length;}function renderAdmin(){document.querySelectorAll('.admin nav button').forEach(function(b){b.classList.toggle('selected',b.dataset.tab===tab);});var c=$('adminContent');if(tab==='settings'){c.innerHTML='<div class="card"><h2>Genel Ayarlar</h2><div class="formGrid"><label>Oyun başlığı<input id="setTitle" value="'+esc(data.settings.title)+'"></label><label>Alt başlık<input id="setSub" value="'+esc(data.settings.subtitle)+'"></label><label>Oyun süresi (10–3600 saniye)<input id="setDuration" type="number" min="10" max="3600" value="'+data.settings.durationSeconds+'"></label><label>Yönetici PIN\'i<input id="setPin" value="'+esc(data.settings.adminPin)+'"></label><label><input id="setWarning" type="checkbox" '+(data.settings.lastThirtyWarning?'checked':'')+'> Son 30 saniye uyarısı</label><div><b>Aktif Soru: '+activeCount()+' / 28</b></div></div><button id="saveSettings" class="action">AYARLARI KAYDET</button></div>';$('saveSettings').onclick=saveSettings;}else if(tab==='questions')renderQuestions('');else if(tab==='leaders')renderLeaders();else renderBackup();}
-function saveSettings(){var duration=Math.min(3600,Math.max(10,Number($('setDuration').value)||240));data.settings={title:$('setTitle').value.trim()||D.settings.title,subtitle:$('setSub').value.trim()||D.settings.subtitle,durationSeconds:duration,lastThirtyWarning:$('setWarning').checked,adminPin:$('setPin').value.trim()||'1234'};S.save(data);applySettings();toast('Ayarlar kaydedildi.');renderAdmin();}
-function renderQuestions(search){var f=String(search||'').toLocaleLowerCase('tr-TR');var rows=data.questions.filter(function(q){return q.letter.toLocaleLowerCase('tr-TR').includes(f)||q.question.toLocaleLowerCase('tr-TR').includes(f);}).map(function(q){return'<tr><td>'+q.letter+'</td><td>'+esc(q.question||'—')+'</td><td>'+esc(q.acceptedAnswers[0]||'—')+'</td><td><span class="pill '+(q.enabled?'on':'')+'">'+(q.enabled?'Aktif':'Pasif')+'</span></td><td><button class="quiet editQ" data-letter="'+q.letter+'">DÜZENLE</button></td></tr>';}).join('');$('adminContent').innerHTML='<div class="card"><h2>Soru Bankası <small>Aktif Soru: '+activeCount()+' / 28</small></h2><input id="qSearch" placeholder="Sorularda ara..." value="'+esc(search||'')+'"></div><div class="card"><table class="questionTable"><thead><tr><th>HARF</th><th>SORU</th><th>DOĞRU CEVAP</th><th>DURUM</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';$('qSearch').oninput=function(){renderQuestions(this.value);};document.querySelectorAll('.editQ').forEach(function(b){b.onclick=function(){editQuestion(this.dataset.letter);};});}
-function editQuestion(letter){var q=data.questions.find(function(x){return x.letter===letter;}),alts=q.acceptedAnswers.slice(1).join('\n');modal('<h2>'+letter+' SORUSUNU DÜZENLE</h2><label>Soru<textarea id="eqText" rows="4">'+esc(q.question)+'</textarea></label><label>Ana doğru cevap<input id="eqMain" value="'+esc(q.acceptedAnswers[0]||'')+'"></label><label>Alternatif cevaplar (her satıra bir cevap)<textarea id="eqAlt" rows="3">'+esc(alts)+'</textarea></label><label><input id="eqEnabled" type="checkbox" '+(q.enabled?'checked':'')+'> Oyunda Kullan</label><div class="preview"><small>AKTİF HARF</small><h1>'+letter+'</h1><small>SORU</small><p id="eqPreview">'+esc(q.question)+'</p></div><button id="saveQuestion" class="action">KAYDET</button><button id="clearQuestion" class="danger">SORUYU BOŞALT</button>');setTimeout(function(){$('eqText').oninput=function(){$('eqPreview').textContent=this.value;};$('saveQuestion').onclick=function(){var answers=[$('eqMain').value].concat($('eqAlt').value.split(/\r?\n/)).map(function(x){return x.trim();}).filter(Boolean);q.question=$('eqText').value.trim();q.acceptedAnswers=answers;q.enabled=$('eqEnabled').checked;S.save(data);closeModal();renderQuestions($('qSearch')?$('qSearch').value:'');buildRing();toast('Kaydedildi.');};$('clearQuestion').onclick=function(){q.question='';q.acceptedAnswers=[];q.enabled=false;S.save(data);closeModal();renderQuestions('');buildRing();toast('Soru boşaltıldı.');};},0);}
-function sortedLeaders(){return data.leaderboard.slice().sort(function(a,b){return b.score-a.score||a.usedSeconds-b.usedSeconds||new Date(a.playedAt)-new Date(b.playedAt);});}function renderLeaders(){var rows=sortedLeaders().map(function(x,i){return'<tr><td>'+(i+1)+'</td><td>'+esc(x.playerName)+'</td><td>'+x.score+'/'+x.totalQuestions+'</td><td>'+format(x.usedSeconds)+'</td><td>'+new Date(x.playedAt).toLocaleString('tr-TR')+'</td><td><button class="danger delLeader" data-id="'+x.id+'">SİL</button></td></tr>';}).join('')||'<tr><td colspan="6">Henüz kayıt yok.</td></tr>';$('adminContent').innerHTML='<div class="card"><h2>Liderlik Tablosu</h2><table class="leader"><thead><tr><th>#</th><th>YARIŞMACI</th><th>PUAN</th><th>SÜRE</th><th>TARİH</th><th></th></tr></thead><tbody>'+rows+'</tbody></table><button id="clearLeaders" class="danger">TÜMÜNÜ TEMİZLE</button></div>';document.querySelectorAll('.delLeader').forEach(function(b){b.onclick=function(){data.leaderboard=data.leaderboard.filter(function(x){return x.id!==b.dataset.id;});S.save(data);renderLeaders();};});$('clearLeaders').onclick=function(){if(confirm('Liderlik tablosundaki bütün sonuçlar silinecek. Emin misiniz?')){data.leaderboard=[];S.save(data);renderLeaders();}};}
-function renderBackup(){$('adminContent').innerHTML='<div class="card"><h2>Yedekleme / Geri Yükleme</h2><p>Sorular, ayarlar ve liderlik kayıtları tek JSON dosyasında taşınır.</p><button id="exportBtn" class="action">YEDEĞİ İNDİR</button> <label class="quiet" style="display:inline-block">YEDEĞİ GERİ YÜKLE<input id="importFile" type="file" accept="application/json,.json" hidden></label><p><button id="resetData" class="danger">VARSAYILANLARA DÖN</button></p></div>';$('exportBtn').onclick=exportData;$('importFile').onchange=importData;$('resetData').onclick=function(){if(confirm('Tüm yerel veriler varsayılana dönecek. Emin misiniz?')){data=S.fresh();S.save(data);applySettings();buildRing();renderBackup();toast('Varsayılan veriler yüklendi.');}};}
-function exportData(){var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),a=document.createElement('a'),date=new Date().toISOString().slice(0,10);a.href=URL.createObjectURL(blob);a.download='TCDD_Passaparola_Yedek_'+date+'.json';a.click();setTimeout(function(){URL.revokeObjectURL(a.href);},500);}
-function importData(ev){var file=ev.target.files[0];if(!file)return;var reader=new FileReader();reader.onload=function(){try{var d=JSON.parse(reader.result);if(!S.valid(d))throw Error();data=S.normalize(d);S.save(data);applySettings();buildRing();toast('Yedek geri yüklendi.');renderBackup();}catch(e){toast('Geçersiz yedek; mevcut veriler korunuyor.');}};reader.readAsText(file,'utf-8');}
-function init(){applySettings();buildRing();$('startBtn').onclick=function(){if(stopped)resumeGame();else if(engine.running)stopGame();else startDialog();};$('resetBtn').onclick=function(){if(stopped&&confirm('Durdurulan yarışma kaydedilmeden silinecek ve başlangıç ekranına dönülecek. Emin misiniz?'))resetGame();};$('checkBtn').onclick=function(){act('answer');};$('passBtn').onclick=function(){act('pass');};$('answerInput').onkeydown=function(e){if(e.key==='Enter'){e.preventDefault();act('answer');}};$('adminBtn').onclick=pinAdmin;$('fullBtn').onclick=function(){var p=document.documentElement.requestFullscreen;if(p)p.call(document.documentElement).catch(function(){toast('Tam ekran kullanılamıyor.');});else toast('Tam ekran desteklenmiyor.');};$('modalClose').onclick=closeModal;$('modal').onclick=function(e){if(e.target===$('modal'))closeModal();};$('closeAdmin').onclick=function(){$('adminScreen').classList.add('hidden');$('gameScreen').classList.remove('hidden');};document.querySelectorAll('.admin nav button').forEach(function(b){b.onclick=function(){tab=b.dataset.tab;renderAdmin();};});window.addEventListener('beforeunload',stopTimer);}
-document.addEventListener('DOMContentLoaded',init);window.PassaparolaAppTest={resetGame:resetGame};
-/* Gelişmiş tur ve soru havuzu davranışları (önceki bildirimlerin üzerine yazar). */
-var updateStyle=document.createElement('style');updateStyle.textContent=':root{--yellow:#ffcc00}.letter.passed{background:var(--yellow)!important;color:#17202a;border-color:#ffe680}.pass{background:var(--yellow)!important;color:#17202a}.passFeedback{color:var(--yellow)}.questionTools{display:grid;grid-template-columns:1fr 90px auto;gap:10px;align-items:center}.questionTools select{height:46px;border:2px solid #9aabba;border-radius:8px;background:#fff;padding:0 10px}@media(max-width:760px){.questionTools{grid-template-columns:1fr}.questionTools select{width:100%}}';document.head.appendChild(updateStyle);
-act=function(kind){if(!engine.running||locked)return;locked=true;setControls(false);var result;if(kind==='pass'){result=engine.resolve('passed');feedback('PAS','passFeedback');}else{var value=$('answerInput').value;if(!value.trim()){locked=false;setControls(true);toast('Lütfen bir cevap girin.');return;}result=engine.answer(value);feedback(result.correct?'DOĞRU':'YANLIŞ',result.correct?'ok':'bad');}showCurrent();setTimeout(function(){if(result.restart){engine.restartRound();feedback('YANLIŞ – A HARFİNDEN TEKRAR','bad');}locked=false;if(result.ended)finish('Tamamlandı');else showCurrent();},700);};
-renderQuestions=function(search){var f=String(search||'').toLocaleLowerCase('tr-TR');var rows=data.questions.filter(function(q){return q.letter.toLocaleLowerCase('tr-TR').includes(f)||q.question.toLocaleLowerCase('tr-TR').includes(f);}).map(function(q){return'<tr><td>'+q.letter+'</td><td>'+esc(q.question||'—')+'</td><td>'+esc(q.acceptedAnswers[0]||'—')+'</td><td><label><input type="radio" class="activateQ" name="active_'+q.letter+'" data-id="'+esc(q.id)+'" '+(q.enabled?'checked':'')+'> '+(q.enabled?'Aktif':'Pasif')+'</label></td><td><button class="quiet editQ" data-id="'+esc(q.id)+'">DÜZENLE</button></td></tr>';}).join('');$('adminContent').innerHTML='<div class="card"><h2>Soru Bankası <small>Aktif Soru: '+activeCount()+' / 28</small></h2><div class="questionTools"><input id="qSearch" placeholder="Sorularda ara..." value="'+esc(search||'')+'"><select id="newLetter">'+D.letters.map(function(l){return'<option>'+l+'</option>';}).join('')+'</select><button id="addQuestion" class="action">YENİ SORU EKLE</button></div></div><div class="card"><table class="questionTable"><thead><tr><th>HARF</th><th>SORU</th><th>DOĞRU CEVAP</th><th>AKTİF SEÇİM</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';$('qSearch').oninput=function(){renderQuestions(this.value);};$('addQuestion').onclick=function(){editQuestion(null,$('newLetter').value);};document.querySelectorAll('.editQ').forEach(function(b){b.onclick=function(){editQuestion(this.dataset.id);};});document.querySelectorAll('.activateQ').forEach(function(r){r.onchange=function(){activateQuestion(this.dataset.id);};});};
-function activateQuestion(id){var q=data.questions.find(function(x){return x.id===id;});if(!q||!q.question.trim()||!q.acceptedAnswers.length){toast('Boş bir soru aktif yapılamaz.');renderQuestions($('qSearch').value);return;}data.questions.forEach(function(x){if(x.letter===q.letter)x.enabled=x.id===id;});S.save(data);buildRing();renderQuestions($('qSearch').value);toast(q.letter+' harfi için aktif soru seçildi.');}
-editQuestion=function(id,newLetter){var q=id?data.questions.find(function(x){return x.id===id;}):{id:'q_'+Date.now()+'_'+Math.random().toString(36).slice(2),letter:newLetter,question:'',acceptedAnswers:[],enabled:false},isNew=!id,alts=q.acceptedAnswers.slice(1).join('\n');modal('<h2>'+q.letter+' SORUSUNU '+(isNew?'EKLE':'DÜZENLE')+'</h2><label>Soru<textarea id="eqText" rows="4">'+esc(q.question)+'</textarea></label><label>Ana doğru cevap<input id="eqMain" value="'+esc(q.acceptedAnswers[0]||'')+'"></label><label>Alternatif cevaplar (her satıra bir cevap)<textarea id="eqAlt" rows="3">'+esc(alts)+'</textarea></label><label><input id="eqEnabled" type="checkbox" '+(q.enabled?'checked':'')+'> Bu harfin aktif sorusu yap</label><div class="preview"><small>AKTİF HARF</small><h1>'+q.letter+'</h1><small>SORU</small><p id="eqPreview">'+esc(q.question)+'</p></div><button id="saveQuestion" class="action">KAYDET</button>'+(isNew?'':'<button id="deleteQuestion" class="danger">SORUYU SİL</button>'));setTimeout(function(){$('eqText').oninput=function(){$('eqPreview').textContent=this.value;};$('saveQuestion').onclick=function(){var answers=[$('eqMain').value].concat($('eqAlt').value.split(/\r?\n/)).map(function(x){return x.trim();}).filter(Boolean),wantActive=$('eqEnabled').checked;q.question=$('eqText').value.trim();q.acceptedAnswers=answers;if(wantActive&&q.question&&answers.length)data.questions.forEach(function(x){if(x.letter===q.letter)x.enabled=false;});q.enabled=wantActive&&!!q.question&&answers.length>0;if(isNew)data.questions.push(q);S.save(data);closeModal();renderQuestions('');buildRing();toast('Kaydedildi.');};if(!isNew)$('deleteQuestion').onclick=function(){if(data.questions.filter(function(x){return x.letter===q.letter;}).length<=1){toast('Her harf için en az bir havuz kaydı korunmalıdır.');return;}if(confirm('Bu soru silinecek. Emin misiniz?')){data.questions=data.questions.filter(function(x){return x.id!==q.id;});S.save(data);closeModal();renderQuestions('');buildRing();}};},0);};
-window.PassaparolaOnlineHooks={start:function(roomQuestions,roomSettings,name){data.questions=(roomQuestions||[]).map(function(q){var x=JSON.parse(JSON.stringify(q));x.enabled=true;return x;});data.settings=Object.assign({},data.settings,roomSettings||{});player=String(name||'Online Oyuncu');recorded=false;locked=false;stopped=false;engine.start(data.questions);$('player').textContent=player;$('feedback').textContent='ONLINE ODA BAŞLADI';setGameButton('running');showCurrent();startTimer();}};
-renderQuestions=function(search){var f=String(search||'').toLocaleLowerCase('tr-TR'),rows=D.letters.filter(function(l){return l.toLocaleLowerCase('tr-TR').includes(f)||data.questions.some(function(q){return q.letter===l&&q.question.toLocaleLowerCase('tr-TR').includes(f);});}).map(function(l){var pool=data.questions.filter(function(q){return q.letter===l;}),selected=pool.find(function(q){return q.enabled||q.selected;}),on=pool.some(function(q){return q.enabled;});return'<tr><td>'+l+'</td><td>'+(selected?esc(selected.question||'Henüz soru girilmedi'):'Henüz soru yok')+'</td><td>'+pool.length+' soru</td><td><input type="checkbox" class="letterToggle" data-letter="'+l+'" '+(on?'checked':'')+' aria-label="'+l+' harfini aktif yap"></td><td><button class="quiet editLetter" data-letter="'+l+'">＋ / ✎ DÜZENLE</button></td></tr>';}).join('');$('adminContent').innerHTML='<div class="card"><h2>Soru Bankası <small>Aktif Harf: '+activeCount()+' / 28</small></h2><input id="qSearch" placeholder="Harf veya soruda ara..." value="'+esc(search||'')+'"></div><div class="card"><table class="questionTable"><thead><tr><th>HARF</th><th>SEÇİLİ SORU</th><th>HAVUZ</th><th>AKTİF SEÇİM</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';$('qSearch').oninput=function(){renderQuestions(this.value);};document.querySelectorAll('.editLetter').forEach(function(b){b.onclick=function(){editLetter(this.dataset.letter);};});document.querySelectorAll('.letterToggle').forEach(function(c){c.onchange=function(){toggleLetter(this.dataset.letter,this.checked);};});};
-function toggleLetter(letter,on){var pool=data.questions.filter(function(q){return q.letter===letter;}),selected=pool.find(function(q){return q.selected;})||pool.find(function(q){return q.enabled;})||pool[0];pool.forEach(function(q){q.enabled=!!on&&q===selected;q.selected=q===selected;});S.save(data);buildRing();renderQuestions($('qSearch').value);}
-function editLetter(letter){var pool=data.questions.filter(function(q){return q.letter===letter;});function readFields(){document.querySelectorAll('.poolQuestion').forEach(function(el){var q=pool.find(function(x){return x.id===el.dataset.id;});if(q)q.question=el.value.trim();});document.querySelectorAll('.poolMain').forEach(function(el){var q=pool.find(function(x){return x.id===el.dataset.id;}),alt=document.querySelector('.poolAlt[data-id="'+CSS.escape(el.dataset.id)+'"]');if(q)q.acceptedAnswers=[el.value].concat((alt?alt.value:'').split(',')).map(function(x){return x.trim();}).filter(Boolean);});}function draw(){var selected=pool.find(function(q){return q.selected;})||pool.find(function(q){return q.enabled;})||pool[0];modal('<h2>'+letter+' HARFİ SORU HAVUZU</h2><p>Oyunda kullanılacak soruyu seçin. Alternatif cevapları virgülle ayırın.</p><div id="poolEditor">'+pool.map(function(q){return'<div class="poolItem"><label class="poolSelect"><input type="radio" name="poolActive" value="'+esc(q.id)+'" '+(q===selected?'checked':'')+'> Oyunda bu soru kullanılsın</label><label>Soru<textarea class="poolQuestion" data-id="'+esc(q.id)+'" rows="3">'+esc(q.question)+'</textarea></label><label>Ana Cevap<input class="poolMain" data-id="'+esc(q.id)+'" value="'+esc(q.acceptedAnswers[0]||'')+'"></label><label>Alternatif Cevaplar<input class="poolAlt" data-id="'+esc(q.id)+'" value="'+esc(q.acceptedAnswers.slice(1).join(', '))+'" placeholder="cevap 1, cevap 2"></label>'+(pool.length>1?'<button class="danger removePool" data-id="'+esc(q.id)+'">SORUYU SİL</button>':'')+'</div>';}).join('')+'</div><button id="addPool" class="quiet">＋ YENİ SORU EKLE</button><button id="savePool" class="action">KAYDET</button>');setTimeout(function(){$('addPool').onclick=function(){readFields();var q={id:'q_'+Date.now()+'_'+Math.random().toString(36).slice(2),letter:letter,question:'',acceptedAnswers:[],enabled:false,selected:false};pool.push(q);data.questions.push(q);draw();};document.querySelectorAll('.removePool').forEach(function(b){b.onclick=function(){var id=this.dataset.id;data.questions=data.questions.filter(function(q){return q.id!==id;});pool=data.questions.filter(function(q){return q.letter===letter;});draw();};});$('savePool').onclick=function(){readFields();var chosen=document.querySelector('input[name="poolActive"]:checked'),chosenId=chosen&&chosen.value,wasOn=pool.some(function(q){return q.enabled;});if(!chosenId){toast('Bir aktif soru seçin.');return;}var chosenQ=pool.find(function(q){return q.id===chosenId;});if(!chosenQ.question.trim()||!chosenQ.acceptedAnswers.length){toast('Seçili sorunun metni ve ana cevabı zorunludur.');return;}pool.forEach(function(q){q.selected=q.id===chosenId;q.enabled=wasOn&&q.selected;});S.save(data);closeModal();buildRing();renderQuestions('');toast(letter+' soru havuzu kaydedildi.');};},0);}draw();}
+(function () {
+  'use strict';
+
+  var Defaults = window.PassaparolaDefaults;
+  var Storage = window.PassaparolaStorage;
+  var Engine = window.PassaparolaEngine.Engine;
+  var data = Storage.load();
+  var engine = new Engine();
+  var timerId = null;
+  var endAt = 0;
+  var startedAt = 0;
+  var serverOffset = 0;
+  var pausedRemaining = 0;
+  var stoppedAt = 0;
+  var player = '';
+  var gameMode = 'idle';
+  var locked = false;
+  var stopped = false;
+  var recorded = false;
+  var lastRemaining = null;
+  var adminTab = 'settings';
+  var modalResolver = null;
+
+  function $(id) { return document.getElementById(id); }
+  function escapeHtml(value) { var element = document.createElement('div'); element.textContent = String(value); return element.innerHTML; }
+  function clone(value) { return JSON.parse(JSON.stringify(value)); }
+  function format(seconds) { seconds = Math.max(0, Number(seconds) || 0); return String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(seconds % 60).padStart(2, '0'); }
+  function toast(message) { $('toast').textContent = message; $('toast').className = 'show'; clearTimeout(toast.timer); toast.timer = setTimeout(function () { $('toast').className = ''; }, 2100); }
+
+  var screenIds = ['modeScreen', 'onlineLobby', 'waitingRoom', 'teacherPanel', 'gameScreen', 'adminScreen'];
+  function showScreen(id) {
+    screenIds.forEach(function (screenId) { $(screenId).classList.toggle('hidden', screenId !== id); });
+    document.body.dataset.screen = id.replace('Screen', '').replace('Room', '').replace('Panel', '').toLowerCase();
+  }
+
+  function openModal(html, onReady) {
+    $('modalBody').innerHTML = html; $('modal').classList.remove('hidden');
+    requestAnimationFrame(function () { if (onReady) onReady(); });
+  }
+  function closeModal(result) {
+    $('modal').classList.add('hidden');
+    if (modalResolver) { var resolve = modalResolver; modalResolver = null; resolve(result); }
+  }
+  function askPin(title) {
+    if (modalResolver) closeModal(false);
+    return new Promise(function (resolve) {
+      modalResolver = resolve;
+      openModal('<h2 id="modalTitle">' + escapeHtml(title || 'Yönetici PIN Kodu') + '</h2><label>PIN<input id="pinInput" type="password" inputmode="numeric" autocomplete="current-password"></label><button id="pinSubmit" class="action">GİRİŞ</button>', function () {
+        var input = $('pinInput');
+        function submit() {
+          if (input.value === String(data.settings.adminPin)) closeModal(true);
+          else { input.value = ''; input.focus(); toast('PIN kodu hatalı.'); }
+        }
+        $('pinSubmit').onclick = submit;
+        input.onkeydown = function (event) { if (event.key === 'Enter') { event.preventDefault(); submit(); } };
+        input.focus();
+      });
+    });
+  }
+
+  function activeQuestions() { return window.PassaparolaEngine.activeQuestions(data.questions); }
+  function applySettings(settings) {
+    var current = settings || data.settings;
+    $('title').textContent = current.title; $('subtitle').textContent = current.subtitle;
+    document.title = current.title + ' – ' + current.subtitle;
+    if (!engine.running) $('timer').textContent = format(current.durationSeconds);
+  }
+  function buildRing() {
+    $('ring').querySelectorAll('.letter').forEach(function (letter) { letter.remove(); });
+    Defaults.letters.forEach(function (letter, index) {
+      var element = document.createElement('div');
+      var angle = (-90 + index * 360 / Defaults.letters.length) * Math.PI / 180;
+      element.className = 'letter'; element.dataset.letter = letter; element.textContent = letter;
+      element.style.left = (50 + 45 * Math.cos(angle)) + '%'; element.style.top = (50 + 45 * Math.sin(angle)) + '%';
+      $('ring').appendChild(element);
+    });
+    renderRing();
+  }
+  function renderRing() {
+    var enabled = {};
+    var currentQuestions = engine.questions.length ? engine.questions : activeQuestions();
+    currentQuestions.forEach(function (question) { enabled[question.letter] = true; });
+    Defaults.letters.forEach(function (letter) {
+      var element = document.querySelector('.letter[data-letter="' + letter + '"]');
+      var status = engine.status[letter] || 'idle';
+      var labels = { idle: 'bekliyor', active: 'aktif soru', correct: 'doğru cevaplandı', wrong: 'yanlış cevaplandı', passed: 'pas geçildi' };
+      element.className = 'letter ' + status + (enabled[letter] ? '' : ' empty');
+      element.setAttribute('aria-label', letter + ' harfi – ' + labels[status]);
+    });
+  }
+  function setControls(enabled) {
+    $('answerInput').disabled = !enabled; $('checkBtn').disabled = !enabled; $('passBtn').disabled = !enabled;
+    if (enabled) { $('answerInput').value = ''; $('answerInput').focus({ preventScroll: true }); }
+  }
+  function showCurrent() {
+    var question = engine.current; var letter = question ? question.letter : '—';
+    $('activeLetter').textContent = letter; $('activeLetter2').textContent = letter;
+    $('questionText').textContent = question ? question.question : 'Yarışma tamamlandı.';
+    $('score').textContent = engine.score; renderRing(); setControls(engine.running && !locked && !stopped);
+    emitProgress();
+  }
+  function feedback(text, className) { $('feedback').textContent = text; $('feedback').className = className || ''; }
+  function setGameButton(state) {
+    var button = $('startBtn');
+    button.classList.toggle('stopped', state === 'stopped'); button.disabled = gameMode !== 'offline';
+    button.textContent = state === 'running' ? '■ DURDUR' : state === 'stopped' ? '▶ DEVAM ET' : '▶ BAŞLAT';
+    $('resetBtn').classList.toggle('hidden', state !== 'stopped');
+  }
+
+  function startOfflineDialog() {
+    if (engine.running) { toast('Oyun zaten devam ediyor.'); return; }
+    if (!activeQuestions().length) { openModal('<h2 id="modalTitle">OYUN BAŞLATILAMIYOR</h2><p>Yönetim Paneli’nden en az bir aktif soru oluşturun.</p>'); return; }
+    openModal('<h2 id="modalTitle">YARIŞMAYA HAZIR MISINIZ?</h2><label>YARIŞMACI ADI<input id="playerName" maxlength="60" autocomplete="name"></label><button class="action" id="beginGame">OYUNU BAŞLAT</button>', function () {
+      $('beginGame').onclick = beginOffline; $('playerName').onkeydown = function (event) { if (event.key === 'Enter') beginOffline(); }; $('playerName').focus();
+    });
+  }
+  function beginOffline() {
+    var name = $('playerName').value.trim(); if (!name) { toast('Yarışmacı adı zorunludur.'); return; }
+    player = name; gameMode = 'offline'; recorded = false; locked = false; stopped = false;
+    engine.start(data.questions); $('player').textContent = player; feedback(''); setGameButton('running'); closeModal(); showCurrent();
+    startTimer(Date.now(), data.settings.durationSeconds, 0);
+  }
+  function enterOffline() {
+    resetGame(); gameMode = 'offline'; document.body.classList.remove('onlineStudent'); showScreen('gameScreen'); setGameButton('idle');
+  }
+
+  function startTimer(startTimestamp, durationSeconds, offset) {
+    stopTimer(); startedAt = Number(startTimestamp) || Date.now(); serverOffset = Number(offset) || 0;
+    endAt = startedAt + Math.max(10, Number(durationSeconds) || 240) * 1000; lastRemaining = null;
+    tick(); timerId = setInterval(tick, 250);
+  }
+  function stopTimer() { if (timerId) { clearInterval(timerId); timerId = null; } }
+  function remainingSeconds() {
+    var now = Date.now() + (gameMode === 'online' ? serverOffset : 0);
+    return Math.max(0, Math.ceil((endAt - now) / 1000));
+  }
+  function tick() {
+    var remaining = remainingSeconds();
+    $('timer').textContent = format(remaining);
+    $('timer').classList.toggle('urgent', data.settings.lastThirtyWarning && remaining <= 30);
+    if (remaining !== lastRemaining) { lastRemaining = remaining; emitProgress(); }
+    if (remaining <= 0) finish('Süre doldu');
+  }
+  function act(kind) {
+    if (!engine.running || locked || stopped) return;
+    locked = true; setControls(false);
+    var result;
+    if (kind === 'pass') { result = engine.resolve('passed'); feedback('PAS', 'passFeedback'); }
+    else {
+      var value = $('answerInput').value;
+      if (!value.trim()) { locked = false; setControls(true); toast('Lütfen bir cevap girin.'); return; }
+      result = engine.answer(value); feedback(result.correct ? 'DOĞRU' : 'YANLIŞ', result.correct ? 'ok' : 'bad');
+    }
+    showCurrent();
+    setTimeout(function () {
+      if (result.restart) { engine.restartRound(); feedback('YANLIŞ – A HARFİNDEN TEKRAR', 'bad'); }
+      locked = false;
+      if (result.ended) finish('Tamamlandı'); else showCurrent();
+    }, result.restart ? 700 : 480);
+  }
+  function stopGame() {
+    if (gameMode !== 'offline' || !engine.running || stopped) return;
+    pausedRemaining = remainingSeconds(); stoppedAt = Date.now(); stopTimer(); stopped = true; locked = true;
+    setControls(false); setGameButton('stopped'); feedback('OYUN DURDURULDU', 'bad'); toast('Oyun ve süre durduruldu.');
+  }
+  function resumeGame() {
+    if (gameMode !== 'offline' || !engine.running || !stopped) return;
+    startedAt += Date.now() - stoppedAt; endAt = Date.now() + pausedRemaining * 1000; stopped = false; locked = false;
+    setGameButton('running'); feedback('OYUN DEVAM EDİYOR', 'ok'); showCurrent(); tick(); timerId = setInterval(tick, 250);
+  }
+  function resetGame() {
+    stopTimer(); engine.reset(); player = ''; locked = false; recorded = false; stopped = false; lastRemaining = null;
+    $('player').textContent = '—'; $('score').textContent = '0'; feedback('');
+    $('questionText').textContent = 'Yarışmaya başlamak için BAŞLAT düğmesine basın.';
+    $('activeLetter').textContent = $('activeLetter2').textContent = '—'; $('timer').textContent = format(data.settings.durationSeconds);
+    setGameButton('idle'); renderRing(); setControls(false);
+  }
+  function snapshot(status) {
+    return { name: player, score: engine.score, correct: engine.correct, wrong: engine.wrong,
+      currentLetter: engine.current ? engine.current.letter : '—', remainingSeconds: remainingSeconds(),
+      status: status || (engine.running ? 'playing' : 'finished') };
+  }
+  function emitProgress(status) { window.dispatchEvent(new CustomEvent('passaparola:progress', { detail: snapshot(status) })); }
+  function finish(reason) {
+    if (!engine.running && recorded) return;
+    engine.running = false; stopTimer(); setControls(false); setGameButton('idle');
+    var used = Math.max(0, Math.round(((gameMode === 'online' ? Date.now() + serverOffset : Date.now()) - startedAt) / 1000));
+    if (gameMode === 'offline' && !recorded) {
+      data.leaderboard.push({ id: Date.now() + '_' + Math.random().toString(36).slice(2), playerName: player, score: engine.score,
+        totalQuestions: engine.questions.length, correct: engine.correct, wrong: engine.wrong, usedSeconds: used,
+        finishReason: reason, playedAt: new Date().toISOString() });
+      Storage.save(data);
+    }
+    recorded = true; renderRing(); emitProgress('finished');
+    if (gameMode === 'online') {
+      window.dispatchEvent(new CustomEvent('passaparola:finished', { detail: { reason: reason, snapshot: snapshot('finished') } }));
+      return;
+    }
+    openModal('<h2 id="modalTitle">' + (reason === 'Süre doldu' ? 'SÜRE DOLDU!' : 'OYUN TAMAMLANDI') + '</h2><p><b>Yarışmacı:</b> ' + escapeHtml(player) + '</p><p><b>Doğru:</b> ' + engine.correct + ' &nbsp; <b>Yanlış:</b> ' + engine.wrong + ' &nbsp; <b>Puan:</b> ' + engine.score + '</p><button class="action" id="showLocalLeaders">LİDERLİK SIRALAMASI</button><button class="action" id="newGame">YENİ OYUN</button>', function () {
+      $('showLocalLeaders').onclick = function () { closeModal(); showLocalLeaderboard(); };
+      $('newGame').onclick = function () { closeModal(); resetGame(); startOfflineDialog(); };
+    });
+  }
+  function showLocalLeaderboard() {
+    var leaders = sortedLeaders(); $('roomLabel').textContent = 'Çevrimdışı sonuçlar';
+    $('livePlayers').innerHTML = leaders.map(function (entry, index) { return '<li><span>' + (index + 1) + '. ' + escapeHtml(entry.playerName) + '</span><span>' + entry.score + ' puan · ' + format(entry.usedSeconds) + '</span></li>'; }).join('') || '<li>Henüz sonuç yok.</li>';
+    $('liveBoard').classList.remove('hidden');
+  }
+
+  function startOnlineGame(options) {
+    data.settings = Object.assign({}, data.settings, options.settings || {});
+    var roomQuestions = (options.questions || []).map(function (question) { var copy = clone(question); copy.enabled = true; return copy; });
+    player = String(options.playerName || 'Online Oyuncu'); gameMode = 'online'; recorded = false; locked = false; stopped = false;
+    document.body.classList.add('onlineStudent'); showScreen('gameScreen'); applySettings(data.settings);
+    engine.start(roomQuestions); $('player').textContent = player; feedback('ONLINE ODA BAŞLADI', 'ok'); setGameButton('running'); showCurrent();
+    startTimer(options.startAt, data.settings.durationSeconds, options.serverOffset || 0);
+  }
+  function finishOnlineFromTeacher() { if (gameMode === 'online' && !recorded) finish('Öğretmen yarışmayı bitirdi'); }
+
+  function requestAdmin() {
+    askPin('Yönetici PIN Kodu').then(function (allowed) { if (allowed) { adminTab = 'settings'; showScreen('adminScreen'); renderAdmin(); } });
+  }
+  function activeCount() { return activeQuestions().length; }
+  function renderAdmin() {
+    document.querySelectorAll('.admin nav button').forEach(function (button) { button.classList.toggle('selected', button.dataset.tab === adminTab); });
+    if (adminTab === 'settings') renderSettings();
+    else if (adminTab === 'questions') renderQuestions('', null);
+    else if (adminTab === 'leaders') renderLeaders();
+    else renderBackup();
+  }
+  function renderSettings() {
+    $('adminContent').innerHTML = '<div class="card"><h2>Genel Ayarlar</h2><div class="formGrid"><label>Oyun başlığı<input id="setTitle" value="' + escapeHtml(data.settings.title) + '"></label><label>Alt başlık<input id="setSub" value="' + escapeHtml(data.settings.subtitle) + '"></label><label>Oyun süresi (10–3600 saniye)<input id="setDuration" type="number" min="10" max="3600" value="' + data.settings.durationSeconds + '"></label><label>Yönetici PIN’i<input id="setPin" type="password" inputmode="numeric" value="' + escapeHtml(data.settings.adminPin) + '"></label><label><input id="setWarning" type="checkbox" ' + (data.settings.lastThirtyWarning ? 'checked' : '') + '> Son 30 saniye uyarısı</label><div><b>Aktif Soru: ' + activeCount() + ' / ' + Defaults.letters.length + '</b></div></div><button id="saveSettings" class="action">AYARLARI KAYDET</button></div>';
+    $('saveSettings').onclick = function () {
+      data.settings = { title: $('setTitle').value.trim() || Defaults.settings.title, subtitle: $('setSub').value.trim() || Defaults.settings.subtitle,
+        durationSeconds: Math.min(3600, Math.max(10, Number($('setDuration').value) || 240)), lastThirtyWarning: $('setWarning').checked,
+        adminPin: $('setPin').value.trim() || '1234' };
+      Storage.save(data); applySettings(); toast('Ayarlar kaydedildi.'); renderSettings();
+    };
+  }
+  function questionPool(letter) { return data.questions.filter(function (question) { return question.letter === letter; }); }
+  function renderQuestions(search, openLetter) {
+    var filter = String(search || '').toLocaleLowerCase('tr-TR');
+    var accordions = Defaults.letters.filter(function (letter) {
+      return letter.toLocaleLowerCase('tr-TR').includes(filter) || questionPool(letter).some(function (question) { return question.question.toLocaleLowerCase('tr-TR').includes(filter); });
+    }).map(function (letter) {
+      var pool = questionPool(letter); var selected = pool.find(function (question) { return question.selected; }) || pool[0]; var enabled = pool.some(function (question) { return question.enabled; });
+      return '<details class="letterAccordion" data-letter="' + letter + '" ' + (openLetter === letter ? 'open' : '') + '><summary><span class="letterBadge">' + letter + '</span><span><b>' + escapeHtml(selected && selected.question || 'Henüz soru girilmedi') + '</b><br><span class="questionCount">' + pool.length + ' soru · ' + (enabled ? 'Aktif' : 'Pasif') + '</span></span><label class="letterEnable" onclick="event.stopPropagation()"><input type="checkbox" ' + (enabled ? 'checked' : '') + '> Harfi kullan</label></summary><div class="letterAccordionBody">' + pool.map(function (question, index) {
+        return '<div class="poolItem" data-id="' + escapeHtml(question.id) + '"><label class="poolChoice"><input type="radio" name="selected_' + letter + '" value="' + escapeHtml(question.id) + '" ' + (question === selected ? 'checked' : '') + '> Online ve çevrimdışı oyunda bu soru seçilsin</label><label>Soru ' + (index + 1) + '<textarea class="poolQuestion" rows="3">' + escapeHtml(question.question) + '</textarea></label><label>Ana doğru cevap<input class="poolMain" value="' + escapeHtml(question.acceptedAnswers[0] || '') + '"></label><label>Alternatif doğru cevaplar<input class="poolAlt" value="' + escapeHtml(question.acceptedAnswers.slice(1).join(', ')) + '" placeholder="Virgülle ayırın"></label>' + (pool.length > 1 ? '<button class="danger removePool" data-id="' + escapeHtml(question.id) + '">SORUYU SİL</button>' : '') + '</div>';
+      }).join('') + '<div class="poolActions">' + (pool.length < 4 ? '<button class="quiet addPool">＋ YENİ SORU EKLE</button>' : '') + '<button class="action saveLetter">' + letter + ' HARFİNİ KAYDET</button></div></div></details>';
+    }).join('');
+    $('adminContent').innerHTML = '<div class="card"><h2>Soru Bankası <small>Aktif Harf: ' + activeCount() + ' / ' + Defaults.letters.length + '</small></h2><p>Her harf için en fazla 4 soru ve alternatif cevaplar tanımlayın. Seçili soru yarışmada kullanılır.</p><input id="qSearch" placeholder="Harf veya soruda ara…" value="' + escapeHtml(search || '') + '"></div>' + accordions;
+    $('qSearch').oninput = function () { renderQuestions(this.value, null); };
+    document.querySelectorAll('.letterAccordion').forEach(function (details) {
+      var letter = details.dataset.letter;
+      var add = details.querySelector('.addPool'); if (add) add.onclick = function () {
+        var pool = questionPool(letter); if (pool.length >= 4) return;
+        data.questions.push({ id: 'q_' + Date.now() + '_' + Math.random().toString(36).slice(2), letter: letter, question: '', acceptedAnswers: [], enabled: false, selected: false });
+        renderQuestions($('qSearch').value, letter);
+      };
+      details.querySelectorAll('.removePool').forEach(function (button) { button.onclick = function () {
+        if (!confirm('Bu soru havuzdan silinecek. Emin misiniz?')) return;
+        data.questions = data.questions.filter(function (question) { return question.id !== button.dataset.id; });
+        renderQuestions($('qSearch').value, letter);
+      }; });
+      details.querySelector('.saveLetter').onclick = function () { saveLetter(details); };
+    });
+  }
+  function saveLetter(details) {
+    var letter = details.dataset.letter; var pool = questionPool(letter);
+    details.querySelectorAll('.poolItem').forEach(function (item) {
+      var question = pool.find(function (candidate) { return candidate.id === item.dataset.id; });
+      if (!question) return;
+      question.question = item.querySelector('.poolQuestion').value.trim();
+      question.acceptedAnswers = [item.querySelector('.poolMain').value].concat(item.querySelector('.poolAlt').value.split(',')).map(function (answer) { return answer.trim(); }).filter(Boolean);
+    });
+    var selectedInput = details.querySelector('input[type="radio"]:checked'); var enabled = details.querySelector('.letterEnable input').checked;
+    var selected = selectedInput && pool.find(function (question) { return question.id === selectedInput.value; });
+    if (!selected || !selected.question || !selected.acceptedAnswers.length) { toast('Seçili sorunun metni ve ana cevabı zorunludur.'); return; }
+    pool.forEach(function (question) { question.selected = question === selected; question.enabled = enabled && question === selected; });
+    Storage.save(data); buildRing(); toast(letter + ' harfi kaydedildi.'); renderQuestions($('qSearch').value, letter);
+  }
+  function sortedLeaders() { return data.leaderboard.slice().sort(function (a, b) { return b.score - a.score || a.usedSeconds - b.usedSeconds || new Date(a.playedAt) - new Date(b.playedAt); }); }
+  function renderLeaders() {
+    var rows = sortedLeaders().map(function (entry, index) { return '<tr><td>' + (index + 1) + '</td><td>' + escapeHtml(entry.playerName) + '</td><td>' + entry.score + '/' + entry.totalQuestions + '</td><td>' + format(entry.usedSeconds) + '</td><td>' + new Date(entry.playedAt).toLocaleString('tr-TR') + '</td><td><button class="danger delLeader" data-id="' + entry.id + '">SİL</button></td></tr>'; }).join('') || '<tr><td colspan="6">Henüz kayıt yok.</td></tr>';
+    $('adminContent').innerHTML = '<div class="card"><h2>Liderlik Tablosu</h2><table class="leader"><thead><tr><th>#</th><th>YARIŞMACI</th><th>PUAN</th><th>SÜRE</th><th>TARİH</th><th></th></tr></thead><tbody>' + rows + '</tbody></table><button id="clearLeaders" class="danger">TÜMÜNÜ TEMİZLE</button></div>';
+    document.querySelectorAll('.delLeader').forEach(function (button) { button.onclick = function () { data.leaderboard = data.leaderboard.filter(function (entry) { return entry.id !== button.dataset.id; }); Storage.save(data); renderLeaders(); }; });
+    $('clearLeaders').onclick = function () { if (confirm('Bütün sonuçlar silinecek. Emin misiniz?')) { data.leaderboard = []; Storage.save(data); renderLeaders(); } };
+  }
+  function renderBackup() {
+    $('adminContent').innerHTML = '<div class="card"><h2>Yedekleme / Geri Yükleme</h2><p>Sorular, ayarlar ve liderlik kayıtları tek JSON dosyasında taşınır.</p><button id="exportBtn" class="action">YEDEĞİ İNDİR</button> <label class="quiet" style="display:inline-block">YEDEĞİ GERİ YÜKLE<input id="importFile" type="file" accept="application/json,.json" hidden></label><p><button id="resetData" class="danger">VARSAYILANLARA DÖN</button></p></div>';
+    $('exportBtn').onclick = exportData; $('importFile').onchange = importData;
+    $('resetData').onclick = function () { if (confirm('Tüm yerel veriler varsayılana dönecek. Emin misiniz?')) { data = Storage.fresh(); Storage.save(data); applySettings(); buildRing(); renderBackup(); toast('Varsayılan veriler yüklendi.'); } };
+  }
+  function exportData() { var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }); var link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'TCDD_Passaparola_Yedek_' + new Date().toISOString().slice(0, 10) + '.json'; link.click(); setTimeout(function () { URL.revokeObjectURL(link.href); }, 500); }
+  function importData(event) { var file = event.target.files[0]; if (!file) return; var reader = new FileReader(); reader.onload = function () { try { var parsed = JSON.parse(reader.result); if (!Storage.valid(parsed)) throw Error('invalid'); data = Storage.normalize(parsed); Storage.save(data); applySettings(); buildRing(); renderBackup(); toast('Yedek geri yüklendi.'); } catch (error) { toast('Geçersiz yedek; mevcut veriler korunuyor.'); } }; reader.readAsText(file, 'utf-8'); }
+
+  function init() {
+    applySettings(); buildRing(); resetGame();
+    $('startBtn').onclick = function () { if (stopped) resumeGame(); else if (engine.running) stopGame(); else startOfflineDialog(); };
+    $('resetBtn').onclick = function () { if (stopped && confirm('Durdurulan yarışma kaydedilmeden silinecek. Emin misiniz?')) resetGame(); };
+    $('checkBtn').onclick = function () { act('answer'); }; $('passBtn').onclick = function () { act('pass'); };
+    $('answerInput').onkeydown = function (event) { if (event.key === 'Enter') { event.preventDefault(); act('answer'); } };
+    $('homeAdminBtn').onclick = requestAdmin;
+    $('fullBtn').onclick = function () { if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(function () { toast('Tam ekran kullanılamıyor.'); }); else toast('Tam ekran desteklenmiyor.'); };
+    $('gameHome').onclick = function () { if (gameMode === 'online') return; if (engine.running && !confirm('Devam eden oyun sonlandırılacak. Ana sayfaya dönülsün mü?')) return; resetGame(); gameMode = 'idle'; showScreen('modeScreen'); };
+    $('modalClose').onclick = function () { closeModal(false); }; $('modal').onclick = function (event) { if (event.target === $('modal')) closeModal(false); };
+    $('closeAdmin').onclick = function () { showScreen('modeScreen'); };
+    document.querySelectorAll('.admin nav button').forEach(function (button) { button.onclick = function () { adminTab = button.dataset.tab; renderAdmin(); }; });
+    $('closeLive').onclick = function () { $('liveBoard').classList.add('hidden'); };
+    $('leaderHome').onclick = function () { $('liveBoard').classList.add('hidden'); if (gameMode !== 'online') { resetGame(); showScreen('modeScreen'); } else window.dispatchEvent(new CustomEvent('passaparola:home-request')); };
+    window.addEventListener('beforeunload', stopTimer);
+  }
+
+  document.addEventListener('DOMContentLoaded', init);
+  window.PassaparolaApp = {
+    showScreen: showScreen, enterOffline: enterOffline, askPin: askPin, requestAdmin: requestAdmin,
+    getData: function () { return clone(data); }, getActiveQuestions: function () { return clone(activeQuestions()); },
+    startOnlineGame: startOnlineGame, finishOnlineFromTeacher: finishOnlineFromTeacher,
+    showOnlineLeaderboard: function (roomCode, players) {
+      $('roomLabel').textContent = 'Oda: ' + roomCode;
+      $('livePlayers').innerHTML = players.map(function (entry, index) { return '<li><span>' + (index + 1) + '. ' + escapeHtml(entry.name || 'İsimsiz') + '</span><span>' + (entry.score || 0) + ' puan · ' + (entry.status === 'finished' ? 'tamamlandı' : entry.currentLetter || '—') + '</span></li>'; }).join('') || '<li>Henüz sonuç yok.</li>';
+      $('liveBoard').classList.remove('hidden');
+    },
+    toast: toast, format: format, snapshot: snapshot, resetGame: resetGame
+  };
+  window.PassaparolaAppTest = { resetGame: resetGame };
 })();
