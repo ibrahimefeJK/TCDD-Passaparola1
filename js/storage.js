@@ -27,6 +27,14 @@
     var enabledLetters = {};
     var selectedLetters = {};
     base.settings = Object.assign(base.settings, source.settings || {});
+    /* Eski kurulumlarda 1234 kullanılmışsa güvenli yeni varsayılana geçir.
+       Kullanıcının daha önce belirlediği farklı PIN'i ise ilk girişe kadar koru. */
+    if (source.settings && source.settings.adminPin && String(source.settings.adminPin) !== '1234') {
+      base.settings.adminPin = String(source.settings.adminPin);
+      delete base.settings.adminPinHash;
+    } else {
+      delete base.settings.adminPin;
+    }
     base.questions = (source.questions || []).filter(function (question) {
       return global.PassaparolaDefaults.letters.indexOf(question.letter) >= 0;
     }).map(function (question, index) {

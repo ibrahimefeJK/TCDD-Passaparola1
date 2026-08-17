@@ -27,6 +27,13 @@
   function format(seconds) { seconds = Math.max(0, Number(seconds) || 0); return String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(seconds % 60).padStart(2, '0'); }
   function toast(message) { $('toast').textContent = message; $('toast').className = 'show'; clearTimeout(toast.timer); toast.timer = setTimeout(function () { $('toast').className = ''; }, 2100); }
 
+  function hashPin(pin) {
+    var bytes = new TextEncoder().encode('tcdd-passaparola:' + String(pin));
+    return crypto.subtle.digest('SHA-256', bytes).then(function (buffer) {
+      return Array.from(new Uint8Array(buffer)).map(function (byte) { return byte.toString(16).padStart(2, '0'); }).join('');
+    });
+  }
+
   var screenIds = ['modeScreen', 'onlineLobby', 'waitingRoom', 'teacherPanel', 'gameScreen', 'adminScreen'];
   function showScreen(id) {
     screenIds.forEach(function (screenId) { $(screenId).classList.toggle('hidden', screenId !== id); });
@@ -47,8 +54,12 @@
       modalResolver = resolve;
       openModal('<h2 id="modalTitle">' + escapeHtml(title || 'Yönetici PIN Kodu') + '</h2><label>PIN<input id="pinInput" type="password" inputmode="numeric" autocomplete="current-password"></label><button id="pinSubmit" class="action">GİRİŞ</button>', function () {
         var input = $('pinInput');
-        function submit() {
-          if (input.value === String(data.settings.adminPin)) closeModal(true);
+        async function submit() {
+          var entered = input.value;
+          var valid = data.settings.adminPinHash
+            ? await hashPin(entered) === data.settings.adminPinHash
+            : entered === String(data.settings.adminPin || '');
+          if (valid) closeModal(true);
           else { input.value = ''; input.focus(); toast('PIN kodu hatalı.'); }
         }
         $('pinSubmit').onclick = submit;
@@ -229,11 +240,14 @@
     else renderBackup();
   }
   function renderSettings() {
-    $('adminContent').innerHTML = '<div class="card"><h2>Genel Ayarlar</h2><div class="formGrid"><label>Oyun başlığı<input id="setTitle" value="' + escapeHtml(data.settings.title) + '"></label><label>Alt başlık<input id="setSub" value="' + escapeHtml(data.settings.subtitle) + '"></label><label>Oyun süresi (10–3600 saniye)<input id="setDuration" type="number" min="10" max="3600" value="' + data.settings.durationSeconds + '"></label><label>Yönetici PIN’i<input id="setPin" type="password" inputmode="numeric" value="' + escapeHtml(data.settings.adminPin) + '"></label><label><input id="setWarning" type="checkbox" ' + (data.settings.lastThirtyWarning ? 'checked' : '') + '> Son 30 saniye uyarısı</label><div><b>Aktif Soru: ' + activeCount() + ' / ' + Defaults.letters.length + '</b></div></div><button id="saveSettings" class="action">AYARLARI KAYDET</button></div>';
-    $('saveSettings').onclick = function () {
+    $('adminContent').innerHTML = '<div class="card"><h2>Genel Ayarlar</h2><div class="formGrid"><label>Oyun başlığı<input id="setTitle" value="' + escapeHtml(data.settings.title) + '"></label><label>Alt başlık<input id="setSub" value="' + escapeHtml(data.settings.subtitle) + '"></label><label>Oyun süresi (10–3600 saniye)<input id="setDuration" type="number" min="10" max="3600" value="' + data.settings.durationSeconds + '"></label><label>Yeni yönetici PIN’i<input id="setPin" type="password" inputmode="numeric" minlength="6" maxlength="12" placeholder="Değiştirmek istemiyorsanız boş bırakın"></label><label><input id="setWarning" type="checkbox" ' + (data.settings.lastThirtyWarning ? 'checked' : '') + '> Son 30 saniye uyarısı</label><div><b>Aktif Soru: ' + activeCount() + ' / ' + Defaults.letters.length + '</b></div></div><button id="saveSettings" class="action">AYARLARI KAYDET</button></div>';
+    $('saveSettings').onclick = async function () {
+      var newPin = $('setPin').value.trim();
+      if (newPin && !/^\d{6,12}$/.test(newPin)) { toast('PIN 6–12 rakamdan oluşmalıdır.'); return; }
+      var currentHash = data.settings.adminPinHash || (data.settings.adminPin ? await hashPin(data.settings.adminPin) : Defaults.settings.adminPinHash);
       data.settings = { title: $('setTitle').value.trim() || Defaults.settings.title, subtitle: $('setSub').value.trim() || Defaults.settings.subtitle,
         durationSeconds: Math.min(3600, Math.max(10, Number($('setDuration').value) || 240)), lastThirtyWarning: $('setWarning').checked,
-        adminPin: $('setPin').value.trim() || '1234' };
+        adminPinHash: newPin ? await hashPin(newPin) : currentHash };
       Storage.save(data); applySettings(); toast('Ayarlar kaydedildi.'); renderSettings();
     };
   }

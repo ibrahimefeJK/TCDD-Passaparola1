@@ -37,7 +37,8 @@
     }),
     settings: {
       title: 'TCDD EĞİTİM MERKEZİ', subtitle: 'PASSAPAROLA YARIŞMASI',
-      durationSeconds: 240, lastThirtyWarning: true, adminPin: '1234'
+      durationSeconds: 240, lastThirtyWarning: true,
+      adminPinHash: 'dfe8ca892a8a3d3c9594c516e2b75b5238462039fca4717d4f87cd9a9d9c45bf'
     }
   };
 })(window);
