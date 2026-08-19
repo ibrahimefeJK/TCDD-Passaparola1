@@ -151,6 +151,15 @@
   <div id="liveBoard" class="liveBoard hidden">
     <div><button id="closeLive" aria-label="Kapat">×</button><h2>LİDERLİK SIRALAMASI</h2><p id="roomLabel"></p><ol id="livePlayers"></ol><button id="leaderHome" class="action">ANA SAYFAYA DÖN</button></div>
   </div>
+  <button id="userSettingsBtn" class="userSettingsBtn" type="button" aria-label="Kullanıcı ayarlarını aç" title="Ayarlar">⚙</button>
+  <aside id="userSettingsPanel" class="userSettingsPanel hidden" aria-labelledby="userSettingsTitle">
+    <div class="settingsPanelHead"><div><small>OYUN DENEYİMİ</small><h2 id="userSettingsTitle">Ayarlar</h2></div><button id="userSettingsClose" type="button" aria-label="Ayarları kapat">×</button></div>
+    <label class="rangeSetting">Uygulama Boyutu <output id="uiScaleValue">100%</output><input id="uiScale" type="range" min="78" max="112" step="2" value="100"></label>
+    <label>Sesli Mod Hassasiyeti<select id="voiceSensitivity"><option value="high">Yüksek</option><option value="normal" selected>Normal</option><option value="flexible">Esnek</option></select></label>
+    <label class="switchSetting"><input id="highContrast" type="checkbox"><span>Yüksek kontrast</span></label>
+    <label class="switchSetting"><input id="reduceEffects" type="checkbox"><span>Hareketli efektleri azalt</span></label>
+    <button id="resetUserSettings" class="quiet" type="button">VARSAYILAN AYARLAR</button>
+  </aside>
   <div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modalBox"><button id="modalClose" class="x" aria-label="Kapat">×</button><div id="modalBody"></div></div></div>
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="firebase-config.js"></script>

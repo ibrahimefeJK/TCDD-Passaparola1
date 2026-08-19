@@ -16,6 +16,7 @@
   var latestPlayers = [];
   var latestRoom = null;
   var lastProgressKey = '';
+  var safeAreaCache = { key: '', top: 0, right: 0, bottom: 0, left: 0 };
 
   function $(id) { return document.getElementById(id); }
   function show(id) { window.PassaparolaApp.showScreen(id); }
@@ -32,12 +33,14 @@
   }
   function updateViewport() {
     var viewport = window.visualViewport; var height = viewport ? viewport.height : window.innerHeight; var width = viewport ? viewport.width : window.innerWidth;
-    var root = document.documentElement; var portrait = height >= width; var ringSize = portrait ? Math.min(width * .76, height * .38, Math.max(168, height - 355), 350) : Math.min(height * .72, width * .42, 340);
-    root.style.setProperty('--app-height', Math.round(height) + 'px'); root.style.setProperty('--app-width', Math.round(width) + 'px'); root.style.setProperty('--screen-ratio', (width / Math.max(1, height)).toFixed(4)); root.style.setProperty('--ring-size', Math.max(150, Math.round(ringSize)) + 'px'); root.style.setProperty('--ring-zone', Math.max(160, Math.round(ringSize + 8)) + 'px');
+    var root = document.documentElement; var portrait = height >= width; var safe = safeAreaInsets(width, height); var scale = parseFloat(getComputedStyle(root).getPropertyValue('--user-scale')) || 1; var game = $('gameScreen'); var gameVisible = game && !game.classList.contains('hidden'); var headerHeight = gameVisible ? game.querySelector('header').getBoundingClientRect().height : (height < 650 ? 50 : 58); var scoreHeight = gameVisible ? game.querySelector('.scorebar').getBoundingClientRect().height : (height < 650 ? 86 : 98); var stageBudget = Math.max(220, height - headerHeight - scoreHeight - safe.top - safe.bottom); var playMinimum = Math.max(154, Math.min(238, 194 * scale)); var verticalRingBudget = Math.max(126, stageBudget - playMinimum - 10); var ringSize = portrait ? Math.min((width - safe.left - safe.right - 18) * .78 * scale, height * .39 * scale, verticalRingBudget, 356) : Math.min((height - headerHeight - scoreHeight - safe.top - safe.bottom - 12) * .92, width * .42 * scale, 342);
+    var controlHeight = Math.max(36, Math.min(54, 48 * scale, stageBudget * .14)); var questionFont = Math.max(12, Math.min(23, height * .024 * scale));
+    root.style.setProperty('--app-height', Math.round(height) + 'px'); root.style.setProperty('--app-width', Math.round(width) + 'px'); root.style.setProperty('--screen-ratio', (width / Math.max(1, height)).toFixed(4)); root.style.setProperty('--safe-top-px', safe.top + 'px'); root.style.setProperty('--safe-right-px', safe.right + 'px'); root.style.setProperty('--safe-bottom-px', safe.bottom + 'px'); root.style.setProperty('--safe-left-px', safe.left + 'px'); root.style.setProperty('--stage-budget', Math.round(stageBudget) + 'px'); root.style.setProperty('--ring-size', Math.max(126, Math.round(ringSize)) + 'px'); root.style.setProperty('--ring-zone', Math.max(132, Math.round(ringSize + 6)) + 'px'); root.style.setProperty('--mobile-control-height', Math.round(controlHeight) + 'px'); root.style.setProperty('--mobile-question-font', questionFont.toFixed(1) + 'px');
     root.classList.toggle('landscape-ui', width > height); root.classList.toggle('short-viewport', height < 650); root.classList.toggle('very-short-viewport', height < 540); root.classList.toggle('narrow-viewport', width < 360); root.classList.toggle('tall-viewport', height >= 800);
     var keyboardOpen = window.visualViewport && window.visualViewport.height < window.innerHeight * 0.76;
     root.classList.toggle('keyboard-open', Boolean(keyboardOpen) && !root.classList.contains('voice-mode'));
   }
+  function safeAreaInsets(width, height) { var key = Math.round(width) + 'x' + Math.round(height); if (safeAreaCache.key === key) return safeAreaCache; var probe = document.createElement('div'); probe.style.cssText = 'position:fixed;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)'; document.body.appendChild(probe); var style = getComputedStyle(probe); safeAreaCache = { key: key, top: parseFloat(style.paddingTop) || 0, right: parseFloat(style.paddingRight) || 0, bottom: parseFloat(style.paddingBottom) || 0, left: parseFloat(style.paddingLeft) || 0 }; probe.remove(); return safeAreaCache; }
   function finishSplash() {
     setTimeout(function () {
       $('splash').classList.add('fade');
@@ -225,6 +228,7 @@
   function init() {
     detectDevice(); window.addEventListener('resize', detectDevice); window.addEventListener('orientationchange', function () { setTimeout(detectDevice, 120); });
     if (window.visualViewport) { window.visualViewport.addEventListener('resize', updateViewport); window.visualViewport.addEventListener('scroll', updateViewport); }
+    window.addEventListener('passaparola:layout-settings', updateViewport);
     finishSplash(); installSupport();
     $('offlineMode').onclick = function () { window.PassaparolaApp.enterOffline(); };
     $('onlineMode').onclick = function () { setStatus(''); show('onlineLobby'); };

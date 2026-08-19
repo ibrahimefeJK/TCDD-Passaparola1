@@ -32,7 +32,11 @@ assert(html.includes('id="teacherExport"') && app.includes("backupType: 'tcdd-pa
 assert(features.includes('firebaseState.api.remove(roomRef)') && css.includes('.voiceBtn.listening'), 'Canlı oda temizliği ve mikrofon pulse geri bildirimi bulunmalı');
 assert(app.includes('function pronunciationScore') && app.includes('editSimilarity') && app.includes('diceSimilarity') && app.includes('syllableShape'), 'Telaffuz toleransı çoklu matematiksel benzerlik ölçüleri kullanmalı');
 assert(app.includes("replace(/ı/g, 'i')") && app.includes("replace(/ş/g, 's')") && app.includes("toLocaleLowerCase('tr-TR')"), 'Türkçe sesli cevaplar karşılaştırma öncesinde normalize edilmeli');
-assert(app.includes('isPassCommand(transcript)') && app.includes("act('pass')") && app.includes('voiceMode = true'), 'Sesli pas komutu ve kalıcı sesli oyun modu bulunmalı');
+assert(app.includes('isPassCommand(transcript)') && app.includes("act('pass')") && app.includes('setVoiceMode(true)'), 'Sesli pas komutu ve kalıcı sesli oyun modu bulunmalı');
 assert(features.includes("setProperty('--ring-size'") && features.includes("classList.toggle('short-viewport'") && css.includes('.mobile-ui.landscape-ui'), 'Mobil geometri gerçek ekran ölçülerine ve yöne göre hesaplanmalı');
+assert(html.includes('id="userSettingsBtn"') && html.includes('id="uiScale"') && html.includes('id="voiceSensitivity"'), 'Kullanıcı ayar paneli, ölçek ve ses hassasiyeti kontrolleri bulunmalı');
+assert(app.includes("setAttribute('inputmode', 'none')") && app.includes('readOnly = voiceMode') && app.includes('maxAlternatives = 5'), 'Sesli mod mobil klavyeyi kilitlemeli ve alternatif ses sonuçlarını değerlendirmeli');
+assert(features.includes('getBoundingClientRect().height') && features.includes('stageBudget') && features.includes('safeAreaInsets'), 'Mobil yerleşim gerçek dikey DOM bütçesi ve güvenli alanlarla hesaplanmalı');
+assert(css.includes('.userSettingsPanel') && css.includes('html.high-contrast') && css.includes('html.reduce-effects'), 'Kullanıcı görsel tercihleri için kalıcı panel stilleri bulunmalı');
 
-console.log('20/20 arayüz, ses, güvenlik, yedekleme ve mobil sözleşme testi başarılı');
+console.log('24/24 arayüz, ses, ayarlar, güvenlik, yedekleme ve mobil sözleşme testi başarılı');

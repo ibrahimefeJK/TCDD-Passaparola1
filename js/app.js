@@ -22,6 +22,8 @@
   var modalResolver = null;
   var recognition = null;
   var voiceMode = false;
+  var USER_SETTINGS_KEY = 'tcdd_passaparola_user_settings_v1';
+  var userSettings = { scale: 100, voiceSensitivity: 'normal', highContrast: false, reduceEffects: false };
   var PIN_LOCK_KEY = 'tcdd_passaparola_pin_lock_v1';
 
   function $(id) { return document.getElementById(id); }
@@ -29,6 +31,11 @@
   function clone(value) { return JSON.parse(JSON.stringify(value)); }
   function format(seconds) { seconds = Math.max(0, Number(seconds) || 0); return String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(seconds % 60).padStart(2, '0'); }
   function toast(message) { $('toast').textContent = message; $('toast').className = 'show'; clearTimeout(toast.timer); toast.timer = setTimeout(function () { $('toast').className = ''; }, 2100); }
+  function loadUserSettings() { try { userSettings = Object.assign({}, userSettings, JSON.parse(localStorage.getItem(USER_SETTINGS_KEY) || '{}')); } catch (error) {} userSettings.scale = Math.min(112, Math.max(78, Number(userSettings.scale) || 100)); }
+  function applyUserSettings() { var root = document.documentElement, scale = userSettings.scale / 100; root.style.setProperty('--user-scale', scale.toFixed(2)); root.style.setProperty('--desktop-ring-max', Math.round(700 * scale) + 'px'); root.style.setProperty('--scaled-answer-height', Math.round(66 * scale) + 'px'); root.style.setProperty('--scaled-action-height', Math.round(76 * scale) + 'px'); root.style.setProperty('--scaled-base-font', Math.round(16 * scale) + 'px'); root.style.setProperty('--scaled-question-max', Math.round(37 * scale) + 'px'); root.style.setProperty('--scaled-letter-max', Math.round(56 * scale) + 'px'); root.style.setProperty('--scaled-core-max', Math.round(150 * scale) + 'px'); root.classList.toggle('high-contrast', Boolean(userSettings.highContrast)); root.classList.toggle('reduce-effects', Boolean(userSettings.reduceEffects)); if ($('uiScale')) { $('uiScale').value = userSettings.scale; $('uiScaleValue').textContent = userSettings.scale + '%'; $('voiceSensitivity').value = userSettings.voiceSensitivity; $('highContrast').checked = Boolean(userSettings.highContrast); $('reduceEffects').checked = Boolean(userSettings.reduceEffects); } localStorage.setItem(USER_SETTINGS_KEY, JSON.stringify(userSettings)); window.dispatchEvent(new CustomEvent('passaparola:layout-settings'));
+  }
+  function openUserSettings() { applyUserSettings(); $('userSettingsPanel').classList.remove('hidden'); $('userSettingsBtn').setAttribute('aria-expanded', 'true'); }
+  function closeUserSettings() { $('userSettingsPanel').classList.add('hidden'); $('userSettingsBtn').setAttribute('aria-expanded', 'false'); }
 
   function hashPin(pin) {
     var bytes = new TextEncoder().encode('tcdd-passaparola:' + String(pin));
@@ -41,6 +48,7 @@
   function showScreen(id) {
     screenIds.forEach(function (screenId) { $(screenId).classList.toggle('hidden', screenId !== id); });
     document.body.dataset.screen = id.replace('Screen', '').replace('Room', '').replace('Panel', '').toLowerCase();
+    requestAnimationFrame(function () { window.dispatchEvent(new CustomEvent('passaparola:layout-settings')); });
   }
 
   function openModal(html, onReady) {
@@ -114,22 +122,28 @@
     if (enabled) { $('answerInput').value = ''; if (!voiceMode && !document.documentElement.classList.contains('mobile-ui')) $('answerInput').focus({ preventScroll: true }); }
   }
   function speechNormalize(value) { return String(value || '').toLocaleLowerCase('tr-TR').replace(/ı/g, 'i').replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ş/g, 's').replace(/ö/g, 'o').replace(/ç/g, 'c').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim(); }
-  function editSimilarity(left, right) { if (left === right) return 1; if (!left.length || !right.length) return 0; var previous = Array.from({ length: right.length + 1 }, function (_, index) { return index; }); for (var i = 1; i <= left.length; i += 1) { var current = [i]; for (var j = 1; j <= right.length; j += 1) current[j] = Math.min(current[j - 1] + 1, previous[j] + 1, previous[j - 1] + (left[i - 1] === right[j - 1] ? 0 : 1)); previous = current; } return 1 - previous[right.length] / Math.max(left.length, right.length); }
+  function phoneticKey(value) { return speechNormalize(value).replace(/b|p/g, 'P').replace(/d|t/g, 'T').replace(/k|g/g, 'K').replace(/z|s/g, 'S').replace(/c|j/g, 'C').replace(/f|v/g, 'F').replace(/[ae]/g, 'A').replace(/[iu]/g, 'I').replace(/o/g, 'O').replace(/(.)\1+/g, '$1').replace(/\s/g, ''); }
+  function editSimilarity(left, right) { if (left === right) return 1; if (!left.length || !right.length) return 0; var matrix = Array.from({ length: left.length + 1 }, function (_, row) { return Array.from({ length: right.length + 1 }, function (__, column) { return row ? (column ? 0 : row) : column; }); }); for (var i = 1; i <= left.length; i += 1) for (var j = 1; j <= right.length; j += 1) { var cost = left[i - 1] === right[j - 1] ? 0 : 1; matrix[i][j] = Math.min(matrix[i - 1][j] + 1, matrix[i][j - 1] + 1, matrix[i - 1][j - 1] + cost); if (i > 1 && j > 1 && left[i - 1] === right[j - 2] && left[i - 2] === right[j - 1]) matrix[i][j] = Math.min(matrix[i][j], matrix[i - 2][j - 2] + cost); } return 1 - matrix[left.length][right.length] / Math.max(left.length, right.length); }
   function bigrams(value) { var compact = value.replace(/\s/g, ''); if (compact.length < 2) return compact ? [compact] : []; var result = []; for (var i = 0; i < compact.length - 1; i += 1) result.push(compact.slice(i, i + 2)); return result; }
   function diceSimilarity(left, right) { var a = bigrams(left), b = bigrams(right), used = {}, matches = 0; a.forEach(function (pair) { var index = b.findIndex(function (candidate, candidateIndex) { return candidate === pair && !used[candidateIndex]; }); if (index >= 0) { used[index] = true; matches += 1; } }); return a.length + b.length ? 2 * matches / (a.length + b.length) : 0; }
-  function syllableShape(value) { return value.replace(/[aeiou]/g, 'V').replace(/V+/g, 'V').replace(/\s/g, ''); }
-  function pronunciationScore(spoken, expected) { var left = speechNormalize(spoken), right = speechNormalize(expected); if (!left || !right) return 0; var maxLength = Math.max(left.length, right.length); if (Math.abs(left.length - right.length) > Math.max(2, Math.ceil(maxLength * .38))) return 0; return editSimilarity(left, right) * .55 + diceSimilarity(left, right) * .3 + editSimilarity(syllableShape(left), syllableShape(right)) * .15; }
-  function tolerantVoiceAnswer(transcript) { var question = engine.current, best = null; if (!question) return null; question.acceptedAnswers.forEach(function (answer) { var score = pronunciationScore(transcript, answer); if (!best || score > best.score) best = { answer: answer, score: score }; }); var length = speechNormalize(transcript).length, threshold = length <= 3 ? .78 : length <= 5 ? .7 : .64; return best && best.score >= threshold ? best : null; }
-  function isPassCommand(transcript) { return /^pas(?:\s+gec(?:iyorum|elim|in)?)?$/.test(speechNormalize(transcript)); }
+  function syllableShape(value) { return speechNormalize(value).replace(/[^aeiou]+/g, 'C').replace(/[aeiou]+/g, 'V').replace(/(.)\1+/g, '$1'); }
+  function lcsSimilarity(left, right) { var row = Array(right.length + 1).fill(0); for (var i = 1; i <= left.length; i += 1) { var previous = 0; for (var j = 1; j <= right.length; j += 1) { var saved = row[j]; row[j] = left[i - 1] === right[j - 1] ? previous + 1 : Math.max(row[j], row[j - 1]); previous = saved; } } return Math.max(left.length, right.length) ? row[right.length] / Math.max(left.length, right.length) : 0; }
+  function coreSimilarity(left, right) { var best = editSimilarity(left, right), maxLeft = Math.min(8, Math.floor(left.length * .42)), maxRight = Math.min(8, Math.floor(right.length * .42)); for (var a = 0; a <= maxLeft; a += 1) for (var b = 0; b <= maxRight; b += 1) { var l = left.slice(0, left.length - a), r = right.slice(0, right.length - b); if (l.length >= 4 && r.length >= 4) best = Math.max(best, editSimilarity(l, r) * .95); } return best; }
+  function pronunciationScore(spoken, expected) { var left = speechNormalize(spoken).replace(/\s/g, ''), right = speechNormalize(expected).replace(/\s/g, ''); if (!left || !right) return 0; var maxLength = Math.max(left.length, right.length), lengthRatio = Math.min(left.length, right.length) / maxLength; if (lengthRatio < .48) return 0; var leftPhonetic = phoneticKey(left), rightPhonetic = phoneticKey(right); var score = coreSimilarity(left, right) * .27 + coreSimilarity(leftPhonetic, rightPhonetic) * .31 + diceSimilarity(leftPhonetic, rightPhonetic) * .17 + lcsSimilarity(leftPhonetic, rightPhonetic) * .13 + editSimilarity(syllableShape(left), syllableShape(right)) * .12; if (leftPhonetic[0] !== rightPhonetic[0] && score < .76) score *= .82; return Math.min(1, score); }
+  function voiceThreshold(length) { var levels = { high: .52, normal: .57, flexible: .48 }, base = levels[userSettings.voiceSensitivity] || levels.normal; return length <= 3 ? Math.max(.72, base + .12) : length <= 5 ? base + .05 : base; }
+  function tolerantVoiceAnswer(transcript) { var question = engine.current, best = null; if (!question) return null; question.acceptedAnswers.forEach(function (answer) { var score = pronunciationScore(transcript, answer); if (!best || score > best.score) best = { answer: answer, score: score, transcript: transcript }; }); var length = speechNormalize(transcript).replace(/\s/g, '').length; return best && best.score >= voiceThreshold(length) ? best : null; }
+  function isPassCommand(transcript) { var normal = speechNormalize(transcript).replace(/\s/g, ''); if (/^pass?$/.test(normal) || /^pas[dt][ae]$/.test(normal)) return true; if (normal.indexOf('pas') !== 0) return false; var tail = normal.slice(3); return tail.length > 0 && tail.length <= 10 && (tail.indexOf('gec') === 0 || pronunciationScore(tail.slice(0, Math.min(4, tail.length)), 'gec') >= .42); }
+  function selectVoiceResult(event) { var alternatives = event.results && event.results[0] ? Array.from(event.results[0]).map(function (item) { return item.transcript; }).filter(Boolean) : []; var command = alternatives.find(isPassCommand); if (command) return { command: 'pass', transcript: command }; var best = null; alternatives.forEach(function (transcript) { var match = tolerantVoiceAnswer(transcript); if (match && (!best || match.score > best.score)) best = match; }); return best || { transcript: alternatives[0] || '' }; }
+  function setVoiceMode(active) { voiceMode = Boolean(active); document.documentElement.classList.toggle('voice-mode', voiceMode); $('answerInput').readOnly = voiceMode; if (voiceMode) { $('answerInput').setAttribute('inputmode', 'none'); $('answerInput').blur(); if (document.activeElement === $('answerInput')) document.body.focus(); } else $('answerInput').setAttribute('inputmode', 'text'); }
   function stopVoiceRecognition() { if (recognition) { try { recognition.abort(); } catch (error) {} recognition = null; } $('voiceBtn').classList.remove('listening'); $('voiceBtn').setAttribute('aria-pressed', 'false'); }
   function voiceError(message) { stopVoiceRecognition(); feedback(message, 'bad'); toast(message); }
   function startVoiceRecognition() {
     if ($('voiceBtn').disabled || locked || stopped) return;
     var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) { voiceError('Bu tarayıcı sesli cevap özelliğini desteklemiyor.'); return; }
-    voiceMode = true; $('answerInput').blur(); document.documentElement.classList.add('voice-mode'); stopVoiceRecognition(); recognition = new SpeechRecognition(); recognition.lang = 'tr-TR'; recognition.interimResults = false; recognition.maxAlternatives = 1; recognition.continuous = false;
+    setVoiceMode(true); stopVoiceRecognition(); recognition = new SpeechRecognition(); recognition.lang = 'tr-TR'; recognition.interimResults = false; recognition.maxAlternatives = 5; recognition.continuous = false;
     recognition.onstart = function () { $('voiceBtn').classList.add('listening'); $('voiceBtn').setAttribute('aria-pressed', 'true'); feedback('DİNLENİYOR… Cevabınızı söyleyin.', 'voiceFeedback'); };
-    recognition.onresult = function (event) { var transcript = event.results && event.results[0] && event.results[0][0] && event.results[0][0].transcript; stopVoiceRecognition(); if (!transcript) { voiceError('Ses anlaşılamadı. Lütfen tekrar deneyin.'); return; } if (isPassCommand(transcript)) { feedback('SESLİ PAS KOMUTU ALINDI', 'passFeedback'); setTimeout(function () { act('pass'); }, 120); return; } var match = tolerantVoiceAnswer(transcript); $('answerInput').value = match ? match.answer : transcript.trim(); feedback(match ? 'TELAFFUZ EŞLEŞTİ · %' + Math.round(match.score * 100) : 'Sesli cevap alındı.', match ? 'ok' : 'voiceFeedback'); setTimeout(function () { act('answer'); }, 180); };
+    recognition.onresult = function (event) { var result = selectVoiceResult(event); stopVoiceRecognition(); if (!result.transcript) { voiceError('Ses anlaşılamadı. Lütfen tekrar deneyin.'); return; } if (result.command === 'pass') { feedback('SESLİ PAS KOMUTU ALINDI', 'passFeedback'); setTimeout(function () { act('pass'); }, 120); return; } $('answerInput').value = result.answer || result.transcript.trim(); feedback(result.answer ? 'FONETİK EŞLEŞME · %' + Math.round(result.score * 100) : 'Sesli cevap alındı.', result.answer ? 'ok' : 'voiceFeedback'); setTimeout(function () { act('answer'); }, 180); };
     recognition.onerror = function (event) { var messages = { 'not-allowed': 'Mikrofon izni verilmedi. Tarayıcı ayarlarından mikrofonu açın.', 'service-not-allowed': 'Ses tanıma hizmetine erişilemiyor.', 'no-speech': 'Ses algılanamadı. Mikrofona daha yakın konuşun.', 'audio-capture': 'Kullanılabilir bir mikrofon bulunamadı.', network: 'Ses tanıma için ağ bağlantısı kurulamadı.' }; voiceError(messages[event.error] || 'Sesli cevap alınamadı. Lütfen tekrar deneyin.'); };
     recognition.onend = function () { if (recognition) stopVoiceRecognition(); };
     try { recognition.start(); } catch (error) { voiceError('Mikrofon başlatılamadı. Lütfen tekrar deneyin.'); }
@@ -351,7 +365,7 @@
     $('resetBtn').onclick = function () { if (stopped && confirm('Durdurulan yarışma kaydedilmeden silinecek. Emin misiniz?')) resetGame(); };
     $('checkBtn').onclick = function () { act('answer'); }; $('passBtn').onclick = function () { act('pass'); };
     $('voiceBtn').onclick = function () { if ($('voiceBtn').classList.contains('listening')) stopVoiceRecognition(); else startVoiceRecognition(); };
-    $('answerInput').onpointerdown = function () { voiceMode = false; document.documentElement.classList.remove('voice-mode'); };
+    $('answerInput').onpointerdown = function () { setVoiceMode(false); };
     $('answerInput').onkeydown = function (event) { if (event.key === 'Enter') { event.preventDefault(); act('answer'); } };
     $('homeAdminBtn').onclick = requestAdmin;
     $('fullBtn').onclick = function () { if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(function () { toast('Tam ekran kullanılamıyor.'); }); else toast('Tam ekran desteklenmiyor.'); };
@@ -361,6 +375,12 @@
     document.querySelectorAll('.admin nav button').forEach(function (button) { button.onclick = function () { adminTab = button.dataset.tab; renderAdmin(); }; });
     $('closeLive').onclick = function () { $('liveBoard').classList.add('hidden'); };
     $('leaderHome').onclick = function () { $('liveBoard').classList.add('hidden'); if (gameMode !== 'online') { resetGame(); showScreen('modeScreen'); } else window.dispatchEvent(new CustomEvent('passaparola:home-request')); };
+    loadUserSettings(); applyUserSettings(); $('userSettingsBtn').onclick = openUserSettings; $('userSettingsClose').onclick = closeUserSettings;
+    $('uiScale').oninput = function () { userSettings.scale = Number(this.value); applyUserSettings(); };
+    $('voiceSensitivity').onchange = function () { userSettings.voiceSensitivity = this.value; applyUserSettings(); };
+    $('highContrast').onchange = function () { userSettings.highContrast = this.checked; applyUserSettings(); };
+    $('reduceEffects').onchange = function () { userSettings.reduceEffects = this.checked; applyUserSettings(); };
+    $('resetUserSettings').onclick = function () { userSettings = { scale: 100, voiceSensitivity: 'normal', highContrast: false, reduceEffects: false }; applyUserSettings(); toast('Kullanıcı ayarları sıfırlandı.'); };
     window.addEventListener('beforeunload', stopTimer);
   }
 
