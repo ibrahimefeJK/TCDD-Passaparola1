@@ -82,6 +82,15 @@
       return (b.score || 0) - (a.score || 0) || String(a.name || '').localeCompare(String(b.name || ''), 'tr');
     });
   }
+  function roomBackup() {
+    if (!roomCode || !latestRoom) return null;
+    return { backupType: 'tcdd-passaparola-room', version: 1, exportedAt: new Date().toISOString(), roomCode: roomCode,
+      status: latestRoom.status || roomStatus, settings: Object.assign({}, latestRoom.settings || {}), questions: JSON.parse(JSON.stringify(latestRoom.questions || [])),
+      rules: { selectedQuestionIds: (latestRoom.questions || []).map(function (question) { return question.id; }), finishReason: latestRoom.finishReason || null },
+      leaderboard: playerArray(latestRoom.players).map(function (entry) { return { name: entry.name || 'İsimsiz', score: Number(entry.score) || 0, correct: Number(entry.correct) || 0, wrong: Number(entry.wrong) || 0, status: entry.status || 'waiting', remainingSeconds: Number(entry.remainingSeconds) || 0 }; }) };
+  }
+  function exportRoomBackup() { var backup = roomBackup(); if (!backup) { window.PassaparolaApp.toast('Yedeklenecek oda verisi bulunamadı.'); return; } window.PassaparolaApp.downloadBackup(backup); window.PassaparolaApp.toast('Oda ' + roomCode + ' yedeği indirildi.'); }
+  function importRoomBackup(event) { var file = event.target.files[0]; if (!file) return; var reader = new FileReader(); reader.onload = function () { try { var backup = JSON.parse(reader.result); if (backup.backupType !== 'tcdd-passaparola-room' || !backup.settings || !Array.isArray(backup.questions) || !Array.isArray(backup.leaderboard)) throw Error('invalid'); window.PassaparolaApp.showBackupReport(backup); event.target.value = ''; } catch (error) { window.PassaparolaApp.toast('Geçersiz oda yedeği; canlı veriler değiştirilmedi.'); } }; reader.readAsText(file, 'utf-8'); }
   function clearRoomListeners() {
     if (roomUnsubscribe) roomUnsubscribe(); roomUnsubscribe = null;
     lastProgressKey = ''; latestPlayers = []; latestRoom = null;
@@ -163,6 +172,7 @@
       if (!confirm('Devam eden yarışma sonlandırılacak. Ana sayfaya dönülsün mü?')) return;
       await firebaseState.api.update(roomRef, { status: 'finished', endedAt: firebaseState.api.serverTimestamp(), finishReason: 'teacher-left' }).catch(function () {});
     }
+    if (role === 'teacher' && firebaseState && roomRef) await firebaseState.api.remove(roomRef).catch(function () {});
     resetOnlineState(); show('modeScreen');
   }
   function listenRoom(code, listenerRole) {
@@ -219,6 +229,7 @@
     $('backModes').onclick = function () { show('modeScreen'); };
     $('createRoom').onclick = createRoom; $('joinRoom').onclick = joinRoom; $('leaveWaiting').onclick = leaveWaiting;
     $('teacherStart').onclick = startRoom; $('teacherFinish').onclick = finishRoom; $('teacherHome').onclick = teacherHome;
+    $('teacherExport').onclick = exportRoomBackup; $('teacherImport').onchange = importRoomBackup;
     $('copyRoomCode').onclick = async function () { try { await navigator.clipboard.writeText(roomCode); window.PassaparolaApp.toast('Oda kodu kopyalandı.'); } catch (error) { window.PassaparolaApp.toast('Oda kodu: ' + roomCode); } };
     $('aboutBtn').onclick = function () { window.location.href = 'about.html?v=4'; };
     window.addEventListener('passaparola:progress', function (event) { syncProgress(event.detail); });

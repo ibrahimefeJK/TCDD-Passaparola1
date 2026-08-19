@@ -26,5 +26,9 @@ assert(css.includes('.mobile-ui .monitorTable thead{display:none}') && features.
 assert(css.includes('.mobile-ui.keyboard-open #gameScreen>.scorebar{display:none;}') && css.includes('.mobile-ui.keyboard-open .check'), 'Klavye açıkken oyun işlemleri görünür kalmalı');
 assert(manifest.display_override.includes('fullscreen') && manifest.icons.some(icon => icon.sizes === '192x192') && manifest.icons.some(icon => icon.sizes === '512x512'), 'PWA tam ekran ve logo simgeleri tanımlı olmalı');
 assert(rules.rules.rooms.$room.players.$player['.write'].includes('$player === auth.uid'), 'Öğrenci yalnızca kendi canlı kaydını yazabilmeli');
+assert(html.includes('id="voiceBtn"') && app.includes("recognition.lang = 'tr-TR'") && app.includes("act('answer')"), 'Türkçe sesli cevap mevcut kontrol akışını tetiklemeli');
+assert(app.includes('tcdd_passaparola_pin_lock_v1') && app.includes('15 * 60 * 1000') && !app.includes("entered === String(data.settings.adminPin"), 'PIN kilidi kalıcı olmalı ve düz metin doğrulama yapılmamalı');
+assert(html.includes('id="teacherExport"') && app.includes("backupType: 'tcdd-passaparola-room'") && features.includes('showBackupReport'), 'Oda yedeği ve salt okunur rapor akışı bulunmalı');
+assert(features.includes('firebaseState.api.remove(roomRef)') && css.includes('.voiceBtn.listening'), 'Canlı oda temizliği ve mikrofon pulse geri bildirimi bulunmalı');
 
-console.log('12/12 arayüz ve online sözleşme testi başarılı');
+console.log('16/16 arayüz, güvenlik, yedekleme ve online sözleşme testi başarılı');

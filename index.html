@@ -93,6 +93,7 @@
         </fieldset>
         <button id="teacherStart" class="action teacherStart">YARIŞMAYI BAŞLAT</button>
         <button id="teacherFinish" class="danger hidden">YARIŞMAYI BİTİR</button>
+        <div class="teacherBackupActions"><button id="teacherExport" class="action" type="button">YEDEĞİ İNDİR</button><label class="quiet fileAction">YEDEĞİ GERİ YÜKLE<input id="teacherImport" type="file" accept="application/json,.json" hidden></label></div>
         <p id="teacherStatus" role="status" aria-live="polite">Öğrenciler bekleniyor.</p>
       </aside>
       <main class="monitorArea">
@@ -130,7 +131,7 @@
         </div>
         <div id="feedback" role="status" aria-live="assertive"></div>
         <div class="answerArea">
-          <label>CEVABINIZ<input id="answerInput" autocomplete="off" autocapitalize="sentences" enterkeyhint="done" disabled></label>
+          <label>CEVABINIZ<span class="answerInputRow"><input id="answerInput" autocomplete="off" autocapitalize="sentences" enterkeyhint="done" disabled><button id="voiceBtn" class="voiceBtn" type="button" aria-label="Cevabı mikrofonla söyle" aria-pressed="false" title="Sesli cevap" disabled><span aria-hidden="true">🎙</span></button></span></label>
           <button id="checkBtn" class="check" disabled>CEVABI KONTROL ET</button>
           <button id="passBtn" class="pass" disabled><b>PAS GEÇME</b><span>SIRADAKİ SORU</span></button>
         </div>

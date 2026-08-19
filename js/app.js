@@ -20,6 +20,8 @@
   var lastRemaining = null;
   var adminTab = 'settings';
   var modalResolver = null;
+  var recognition = null;
+  var PIN_LOCK_KEY = 'tcdd_passaparola_pin_lock_v1';
 
   function $(id) { return document.getElementById(id); }
   function escapeHtml(value) { var element = document.createElement('div'); element.textContent = String(value); return element.innerHTML; }
@@ -52,15 +54,19 @@
     if (modalResolver) closeModal(false);
     return new Promise(function (resolve) {
       modalResolver = resolve;
-      openModal('<h2 id="modalTitle">' + escapeHtml(title || 'Yönetici PIN Kodu') + '</h2><label>PIN<input id="pinInput" type="password" inputmode="numeric" autocomplete="current-password"></label><button id="pinSubmit" class="action">GİRİŞ</button>', function () {
+      var lock = pinLockState();
+      if (lock.until > Date.now()) { modalResolver = null; resolve(false); showPinLock(lock.until); return; }
+      openModal('<h2 id="modalTitle">' + escapeHtml(title || 'Yönetici PIN Kodu') + '</h2><p class="securityNote">3 hatalı girişten sonra panel 15 dakika kilitlenir.</p><label>PIN<input id="pinInput" type="password" inputmode="numeric" autocomplete="current-password"></label><button id="pinSubmit" class="action">GİRİŞ</button>', function () {
         var input = $('pinInput');
         async function submit() {
           var entered = input.value;
-          var valid = data.settings.adminPinHash
-            ? await hashPin(entered) === data.settings.adminPinHash
-            : entered === String(data.settings.adminPin || '');
-          if (valid) closeModal(true);
-          else { input.value = ''; input.focus(); toast('PIN kodu hatalı.'); }
+          var valid = Boolean(data.settings.adminPinHash) && await hashPin(entered) === data.settings.adminPinHash;
+          if (valid) { localStorage.removeItem(PIN_LOCK_KEY); closeModal(true); }
+          else {
+            var failed = pinLockState(); failed.attempts += 1;
+            if (failed.attempts >= 3) { failed = { attempts: 0, until: Date.now() + 15 * 60 * 1000 }; localStorage.setItem(PIN_LOCK_KEY, JSON.stringify(failed)); closeModal(false); showPinLock(failed.until); return; }
+            localStorage.setItem(PIN_LOCK_KEY, JSON.stringify(failed)); input.value = ''; input.focus(); toast('PIN hatalı. Kalan deneme: ' + (3 - failed.attempts));
+          }
         }
         $('pinSubmit').onclick = submit;
         input.onkeydown = function (event) { if (event.key === 'Enter') { event.preventDefault(); submit(); } };
@@ -68,6 +74,8 @@
       });
     });
   }
+  function pinLockState() { try { var state = JSON.parse(localStorage.getItem(PIN_LOCK_KEY) || '{}'); if (state.until && state.until <= Date.now()) { localStorage.removeItem(PIN_LOCK_KEY); return { attempts: 0, until: 0 }; } return { attempts: Number(state.attempts) || 0, until: Number(state.until) || 0 }; } catch (error) { return { attempts: 0, until: 0 }; } }
+  function showPinLock(until) { var minutes = Math.max(1, Math.ceil((until - Date.now()) / 60000)); openModal('<h2 id="modalTitle">YÖNETİM GİRİŞİ KİLİTLENDİ</h2><p>Çok sayıda hatalı PIN denemesi algılandı. Bu tarayıcıda giriş yaklaşık <b>' + minutes + ' dakika</b> sonra yeniden açılacak.</p><p class="securityNote">Sayfayı yenilemek kilidi kaldırmaz.</p>'); }
 
   function activeQuestions() { return window.PassaparolaEngine.activeQuestions(data.questions); }
   function applySettings(settings) {
@@ -100,8 +108,22 @@
     });
   }
   function setControls(enabled) {
-    $('answerInput').disabled = !enabled; $('checkBtn').disabled = !enabled; $('passBtn').disabled = !enabled;
+    $('answerInput').disabled = !enabled; $('checkBtn').disabled = !enabled; $('passBtn').disabled = !enabled; $('voiceBtn').disabled = !enabled;
+    if (!enabled) stopVoiceRecognition();
     if (enabled) { $('answerInput').value = ''; $('answerInput').focus({ preventScroll: true }); }
+  }
+  function stopVoiceRecognition() { if (recognition) { try { recognition.abort(); } catch (error) {} recognition = null; } $('voiceBtn').classList.remove('listening'); $('voiceBtn').setAttribute('aria-pressed', 'false'); }
+  function voiceError(message) { stopVoiceRecognition(); feedback(message, 'bad'); toast(message); }
+  function startVoiceRecognition() {
+    if ($('voiceBtn').disabled || locked || stopped) return;
+    var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) { voiceError('Bu tarayıcı sesli cevap özelliğini desteklemiyor.'); return; }
+    stopVoiceRecognition(); recognition = new SpeechRecognition(); recognition.lang = 'tr-TR'; recognition.interimResults = false; recognition.maxAlternatives = 1; recognition.continuous = false;
+    recognition.onstart = function () { $('voiceBtn').classList.add('listening'); $('voiceBtn').setAttribute('aria-pressed', 'true'); feedback('DİNLENİYOR… Cevabınızı söyleyin.', 'voiceFeedback'); };
+    recognition.onresult = function (event) { var transcript = event.results && event.results[0] && event.results[0][0] && event.results[0][0].transcript; stopVoiceRecognition(); if (!transcript) { voiceError('Ses anlaşılamadı. Lütfen tekrar deneyin.'); return; } $('answerInput').value = transcript.trim(); feedback('Sesli cevap alındı.', 'ok'); setTimeout(function () { act('answer'); }, 180); };
+    recognition.onerror = function (event) { var messages = { 'not-allowed': 'Mikrofon izni verilmedi. Tarayıcı ayarlarından mikrofonu açın.', 'service-not-allowed': 'Ses tanıma hizmetine erişilemiyor.', 'no-speech': 'Ses algılanamadı. Mikrofona daha yakın konuşun.', 'audio-capture': 'Kullanılabilir bir mikrofon bulunamadı.', network: 'Ses tanıma için ağ bağlantısı kurulamadı.' }; voiceError(messages[event.error] || 'Sesli cevap alınamadı. Lütfen tekrar deneyin.'); };
+    recognition.onend = function () { if (recognition) stopVoiceRecognition(); };
+    try { recognition.start(); } catch (error) { voiceError('Mikrofon başlatılamadı. Lütfen tekrar deneyin.'); }
   }
   function showCurrent() {
     var question = engine.current; var letter = question ? question.letter : '—';
@@ -232,19 +254,22 @@
     askPin('Yönetici PIN Kodu').then(function (allowed) { if (allowed) { adminTab = 'settings'; showScreen('adminScreen'); renderAdmin(); } });
   }
   function activeCount() { return activeQuestions().length; }
+  function backupToolbar() { return '<div class="backupToolbar"><span>Yerel oda verileri</span><button class="action quickExport" type="button">YEDEĞİ İNDİR</button><label class="quiet fileAction">YEDEĞİ GERİ YÜKLE<input class="quickImport" type="file" accept="application/json,.json" hidden></label></div>'; }
+  function bindBackupToolbar() { document.querySelectorAll('.quickExport').forEach(function (button) { button.onclick = exportData; }); document.querySelectorAll('.quickImport').forEach(function (input) { input.onchange = importData; }); }
   function renderAdmin() {
     document.querySelectorAll('.admin nav button').forEach(function (button) { button.classList.toggle('selected', button.dataset.tab === adminTab); });
     if (adminTab === 'settings') renderSettings();
     else if (adminTab === 'questions') renderQuestions('', null);
     else if (adminTab === 'leaders') renderLeaders();
     else renderBackup();
+    if (adminTab !== 'backup') { $('adminContent').insertAdjacentHTML('afterbegin', backupToolbar()); bindBackupToolbar(); }
   }
   function renderSettings() {
     $('adminContent').innerHTML = '<div class="card"><h2>Genel Ayarlar</h2><div class="formGrid"><label>Oyun başlığı<input id="setTitle" value="' + escapeHtml(data.settings.title) + '"></label><label>Alt başlık<input id="setSub" value="' + escapeHtml(data.settings.subtitle) + '"></label><label>Oyun süresi (10–3600 saniye)<input id="setDuration" type="number" min="10" max="3600" value="' + data.settings.durationSeconds + '"></label><label>Yeni yönetici PIN’i<input id="setPin" type="password" inputmode="numeric" minlength="6" maxlength="12" placeholder="Değiştirmek istemiyorsanız boş bırakın"></label><label><input id="setWarning" type="checkbox" ' + (data.settings.lastThirtyWarning ? 'checked' : '') + '> Son 30 saniye uyarısı</label><div><b>Aktif Soru: ' + activeCount() + ' / ' + Defaults.letters.length + '</b></div></div><button id="saveSettings" class="action">AYARLARI KAYDET</button></div>';
     $('saveSettings').onclick = async function () {
       var newPin = $('setPin').value.trim();
       if (newPin && !/^\d{6,12}$/.test(newPin)) { toast('PIN 6–12 rakamdan oluşmalıdır.'); return; }
-      var currentHash = data.settings.adminPinHash || (data.settings.adminPin ? await hashPin(data.settings.adminPin) : Defaults.settings.adminPinHash);
+      var currentHash = data.settings.adminPinHash || Defaults.settings.adminPinHash;
       data.settings = { title: $('setTitle').value.trim() || Defaults.settings.title, subtitle: $('setSub').value.trim() || Defaults.settings.subtitle,
         durationSeconds: Math.min(3600, Math.max(10, Number($('setDuration').value) || 240)), lastThirtyWarning: $('setWarning').checked,
         adminPinHash: newPin ? await hashPin(newPin) : currentHash };
@@ -305,14 +330,18 @@
     $('exportBtn').onclick = exportData; $('importFile').onchange = importData;
     $('resetData').onclick = function () { if (confirm('Tüm yerel veriler varsayılana dönecek. Emin misiniz?')) { data = Storage.fresh(); Storage.save(data); applySettings(); buildRing(); renderBackup(); toast('Varsayılan veriler yüklendi.'); } };
   }
-  function exportData() { var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }); var link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'TCDD_Passaparola_Yedek_' + new Date().toISOString().slice(0, 10) + '.json'; link.click(); setTimeout(function () { URL.revokeObjectURL(link.href); }, 500); }
-  function importData(event) { var file = event.target.files[0]; if (!file) return; var reader = new FileReader(); reader.onload = function () { try { var parsed = JSON.parse(reader.result); if (!Storage.valid(parsed)) throw Error('invalid'); data = Storage.normalize(parsed); Storage.save(data); applySettings(); buildRing(); renderBackup(); toast('Yedek geri yüklendi.'); } catch (error) { toast('Geçersiz yedek; mevcut veriler korunuyor.'); } }; reader.readAsText(file, 'utf-8'); }
+  function localBackup() { return { backupType: 'tcdd-passaparola-room', version: 1, exportedAt: new Date().toISOString(), roomCode: 'yerel', status: 'tamamlandı', settings: clone(data.settings), questions: clone(activeQuestions()), leaderboard: clone(sortedLeaders()) }; }
+  function downloadBackup(backup) { var blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }); var link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'oda-' + String(backup.roomCode || 'yerel').toLowerCase() + '-yedek.json'; link.click(); setTimeout(function () { URL.revokeObjectURL(link.href); }, 500); }
+  function exportData() { downloadBackup(localBackup()); toast('Oda yedeği indirildi.'); }
+  function backupReport(backup) { var settings = backup.settings || {}; var leaders = Array.isArray(backup.leaderboard) ? backup.leaderboard : []; var questions = Array.isArray(backup.questions) ? backup.questions : []; var rules = '<li>Süre: <b>' + format(settings.durationSeconds || 0) + '</b></li><li>Son 30 saniye uyarısı: <b>' + (settings.lastThirtyWarning ? 'Açık' : 'Kapalı') + '</b></li><li>Soru sayısı: <b>' + questions.length + '</b></li>'; var rows = leaders.map(function (entry, index) { return '<tr><td>' + (index + 1) + '</td><td>' + escapeHtml(entry.name || entry.playerName || 'İsimsiz') + '</td><td>' + (Number(entry.score) || 0) + '</td><td>' + (entry.correct == null ? '—' : Number(entry.correct)) + '</td></tr>'; }).join('') || '<tr><td colspan="4">Bu yedekte sıralama kaydı yok.</td></tr>'; openModal('<div class="backupReport"><span class="reportTag">GEÇMİŞ ODA RAPORU</span><h2 id="modalTitle">Oda ' + escapeHtml(backup.roomCode || 'yerel') + '</h2><p>Bu rapor yalnızca görüntülenir; canlı odaya veri yazmaz.</p><ul>' + rules + '</ul><h3>Yarışma sonu sıralaması</h3><div class="reportTableWrap"><table><thead><tr><th>#</th><th>Yarışmacı</th><th>Puan</th><th>Doğru</th></tr></thead><tbody>' + rows + '</tbody></table></div></div>'); }
+  function importData(event) { var file = event.target.files[0]; if (!file) return; var reader = new FileReader(); reader.onload = function () { try { var parsed = JSON.parse(reader.result); if (parsed.backupType !== 'tcdd-passaparola-room' || !parsed.settings || !Array.isArray(parsed.questions) || !Array.isArray(parsed.leaderboard)) throw Error('invalid'); backupReport(parsed); event.target.value = ''; } catch (error) { toast('Geçersiz yedek; mevcut veriler korunuyor.'); } }; reader.readAsText(file, 'utf-8'); }
 
   function init() {
     applySettings(); buildRing(); resetGame();
     $('startBtn').onclick = function () { if (stopped) resumeGame(); else if (engine.running) stopGame(); else startOfflineDialog(); };
     $('resetBtn').onclick = function () { if (stopped && confirm('Durdurulan yarışma kaydedilmeden silinecek. Emin misiniz?')) resetGame(); };
     $('checkBtn').onclick = function () { act('answer'); }; $('passBtn').onclick = function () { act('pass'); };
+    $('voiceBtn').onclick = function () { if ($('voiceBtn').classList.contains('listening')) stopVoiceRecognition(); else startVoiceRecognition(); };
     $('answerInput').onkeydown = function (event) { if (event.key === 'Enter') { event.preventDefault(); act('answer'); } };
     $('homeAdminBtn').onclick = requestAdmin;
     $('fullBtn').onclick = function () { if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(function () { toast('Tam ekran kullanılamıyor.'); }); else toast('Tam ekran desteklenmiyor.'); };
@@ -335,7 +364,7 @@
       $('livePlayers').innerHTML = players.map(function (entry, index) { return '<li><span>' + (index + 1) + '. ' + escapeHtml(entry.name || 'İsimsiz') + '</span><span>' + (entry.score || 0) + ' puan · ' + (entry.status === 'finished' ? 'tamamlandı' : entry.currentLetter || '—') + '</span></li>'; }).join('') || '<li>Henüz sonuç yok.</li>';
       $('liveBoard').classList.remove('hidden');
     },
-    toast: toast, format: format, snapshot: snapshot, resetGame: resetGame
+    toast: toast, format: format, snapshot: snapshot, resetGame: resetGame, downloadBackup: downloadBackup, showBackupReport: backupReport
   };
   window.PassaparolaAppTest = { resetGame: resetGame };
 })();
