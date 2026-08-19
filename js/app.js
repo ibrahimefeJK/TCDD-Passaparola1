@@ -22,6 +22,7 @@
   var modalResolver = null;
   var recognition = null;
   var voiceMode = false;
+  var keyboardFocusTimer = null;
   var USER_SETTINGS_KEY = 'tcdd_passaparola_user_settings_v1';
   var userSettings = { scale: 100, voiceSensitivity: 'normal', highContrast: false, reduceEffects: false };
   var PIN_LOCK_KEY = 'tcdd_passaparola_pin_lock_v1';
@@ -32,7 +33,8 @@
   function format(seconds) { seconds = Math.max(0, Number(seconds) || 0); return String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(seconds % 60).padStart(2, '0'); }
   function toast(message) { $('toast').textContent = message; $('toast').className = 'show'; clearTimeout(toast.timer); toast.timer = setTimeout(function () { $('toast').className = ''; }, 2100); }
   function loadUserSettings() { try { userSettings = Object.assign({}, userSettings, JSON.parse(localStorage.getItem(USER_SETTINGS_KEY) || '{}')); } catch (error) {} userSettings.scale = Math.min(112, Math.max(78, Number(userSettings.scale) || 100)); }
-  function applyUserSettings() { var root = document.documentElement, scale = userSettings.scale / 100; root.style.setProperty('--user-scale', scale.toFixed(2)); root.style.setProperty('--desktop-ring-max', Math.round(700 * scale) + 'px'); root.style.setProperty('--scaled-answer-height', Math.round(66 * scale) + 'px'); root.style.setProperty('--scaled-action-height', Math.round(76 * scale) + 'px'); root.style.setProperty('--scaled-base-font', Math.round(16 * scale) + 'px'); root.style.setProperty('--scaled-question-max', Math.round(37 * scale) + 'px'); root.style.setProperty('--scaled-letter-max', Math.round(56 * scale) + 'px'); root.style.setProperty('--scaled-core-max', Math.round(150 * scale) + 'px'); root.classList.toggle('high-contrast', Boolean(userSettings.highContrast)); root.classList.toggle('reduce-effects', Boolean(userSettings.reduceEffects)); if ($('uiScale')) { $('uiScale').value = userSettings.scale; $('uiScaleValue').textContent = userSettings.scale + '%'; $('voiceSensitivity').value = userSettings.voiceSensitivity; $('highContrast').checked = Boolean(userSettings.highContrast); $('reduceEffects').checked = Boolean(userSettings.reduceEffects); } localStorage.setItem(USER_SETTINGS_KEY, JSON.stringify(userSettings)); window.dispatchEvent(new CustomEvent('passaparola:layout-settings'));
+  function applyGameWorldScale() { var game = $('gameScreen'), world = $('gameWorld'); if (!game || !world) return; var scale = Math.min(1.12, Math.max(.78, userSettings.scale / 100)), width = game.clientWidth || window.innerWidth, height = game.clientHeight || window.innerHeight; world.style.setProperty('--world-scale', scale.toFixed(3)); world.style.setProperty('--world-width', Math.round(scale > 1 ? width / scale : width) + 'px'); world.style.setProperty('--world-height', Math.round(scale > 1 ? height / scale : height) + 'px'); }
+  function applyUserSettings() { var root = document.documentElement; root.classList.toggle('high-contrast', Boolean(userSettings.highContrast)); root.classList.toggle('reduce-effects', Boolean(userSettings.reduceEffects)); if ($('uiScale')) { $('uiScale').value = userSettings.scale; $('uiScaleValue').textContent = userSettings.scale + '%'; $('voiceSensitivity').value = userSettings.voiceSensitivity; $('highContrast').checked = Boolean(userSettings.highContrast); $('reduceEffects').checked = Boolean(userSettings.reduceEffects); } localStorage.setItem(USER_SETTINGS_KEY, JSON.stringify(userSettings)); applyGameWorldScale(); window.dispatchEvent(new CustomEvent('passaparola:layout-settings'));
   }
   function openUserSettings() { applyUserSettings(); $('userSettingsPanel').classList.remove('hidden'); $('userSettingsBtn').setAttribute('aria-expanded', 'true'); }
   function closeUserSettings() { $('userSettingsPanel').classList.add('hidden'); $('userSettingsBtn').setAttribute('aria-expanded', 'false'); }
@@ -48,7 +50,7 @@
   function showScreen(id) {
     screenIds.forEach(function (screenId) { $(screenId).classList.toggle('hidden', screenId !== id); });
     document.body.dataset.screen = id.replace('Screen', '').replace('Room', '').replace('Panel', '').toLowerCase();
-    requestAnimationFrame(function () { window.dispatchEvent(new CustomEvent('passaparola:layout-settings')); });
+    requestAnimationFrame(function () { applyGameWorldScale(); window.dispatchEvent(new CustomEvent('passaparola:layout-settings')); });
   }
 
   function openModal(html, onReady) {
@@ -117,10 +119,12 @@
     });
   }
   function setControls(enabled) {
-    $('answerInput').disabled = !enabled; $('checkBtn').disabled = !enabled; $('passBtn').disabled = !enabled; $('voiceBtn').disabled = !enabled;
+    var input = $('answerInput'), keyboardTransition = !enabled && !voiceMode && engine.running && locked && !stopped;
+    input.disabled = !enabled && !keyboardTransition; $('checkBtn').disabled = !enabled; $('passBtn').disabled = !enabled; $('voiceBtn').disabled = !enabled;
     if (!enabled) stopVoiceRecognition();
-    if (enabled) { $('answerInput').value = ''; if (!voiceMode && !document.documentElement.classList.contains('mobile-ui')) $('answerInput').focus({ preventScroll: true }); }
+    if (enabled) { input.value = ''; if (voiceMode) { input.readOnly = true; input.blur(); } else restoreKeyboardFocus(); }
   }
+  function restoreKeyboardFocus() { clearTimeout(keyboardFocusTimer); if (voiceMode) return; var input = $('answerInput'); input.readOnly = false; input.setAttribute('inputmode', 'text'); keyboardFocusTimer = setTimeout(function () { if (!voiceMode && engine.running && !locked && !stopped && !input.disabled) { try { input.focus({ preventScroll: true }); input.setSelectionRange(input.value.length, input.value.length); } catch (error) { input.focus(); } } }, document.documentElement.classList.contains('mobile-ui') ? 75 : 0); }
   function speechNormalize(value) { return String(value || '').toLocaleLowerCase('tr-TR').replace(/ı/g, 'i').replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ş/g, 's').replace(/ö/g, 'o').replace(/ç/g, 'c').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim(); }
   function phoneticKey(value) { return speechNormalize(value).replace(/b|p/g, 'P').replace(/d|t/g, 'T').replace(/k|g/g, 'K').replace(/z|s/g, 'S').replace(/c|j/g, 'C').replace(/f|v/g, 'F').replace(/[ae]/g, 'A').replace(/[iu]/g, 'I').replace(/o/g, 'O').replace(/(.)\1+/g, '$1').replace(/\s/g, ''); }
   function editSimilarity(left, right) { if (left === right) return 1; if (!left.length || !right.length) return 0; var matrix = Array.from({ length: left.length + 1 }, function (_, row) { return Array.from({ length: right.length + 1 }, function (__, column) { return row ? (column ? 0 : row) : column; }); }); for (var i = 1; i <= left.length; i += 1) for (var j = 1; j <= right.length; j += 1) { var cost = left[i - 1] === right[j - 1] ? 0 : 1; matrix[i][j] = Math.min(matrix[i - 1][j] + 1, matrix[i][j - 1] + 1, matrix[i - 1][j - 1] + cost); if (i > 1 && j > 1 && left[i - 1] === right[j - 2] && left[i - 2] === right[j - 1]) matrix[i][j] = Math.min(matrix[i][j], matrix[i - 2][j - 2] + cost); } return 1 - matrix[left.length][right.length] / Math.max(left.length, right.length); }
@@ -134,7 +138,7 @@
   function tolerantVoiceAnswer(transcript) { var question = engine.current, best = null; if (!question) return null; question.acceptedAnswers.forEach(function (answer) { var score = pronunciationScore(transcript, answer); if (!best || score > best.score) best = { answer: answer, score: score, transcript: transcript }; }); var length = speechNormalize(transcript).replace(/\s/g, '').length; return best && best.score >= voiceThreshold(length) ? best : null; }
   function isPassCommand(transcript) { var normal = speechNormalize(transcript).replace(/\s/g, ''); if (/^pass?$/.test(normal) || /^pas[dt][ae]$/.test(normal)) return true; if (normal.indexOf('pas') !== 0) return false; var tail = normal.slice(3); return tail.length > 0 && tail.length <= 10 && (tail.indexOf('gec') === 0 || pronunciationScore(tail.slice(0, Math.min(4, tail.length)), 'gec') >= .42); }
   function selectVoiceResult(event) { var alternatives = event.results && event.results[0] ? Array.from(event.results[0]).map(function (item) { return item.transcript; }).filter(Boolean) : []; var command = alternatives.find(isPassCommand); if (command) return { command: 'pass', transcript: command }; var best = null; alternatives.forEach(function (transcript) { var match = tolerantVoiceAnswer(transcript); if (match && (!best || match.score > best.score)) best = match; }); return best || { transcript: alternatives[0] || '' }; }
-  function setVoiceMode(active) { voiceMode = Boolean(active); document.documentElement.classList.toggle('voice-mode', voiceMode); $('answerInput').readOnly = voiceMode; if (voiceMode) { $('answerInput').setAttribute('inputmode', 'none'); $('answerInput').blur(); if (document.activeElement === $('answerInput')) document.body.focus(); } else $('answerInput').setAttribute('inputmode', 'text'); }
+  function setVoiceMode(active) { voiceMode = Boolean(active); clearTimeout(keyboardFocusTimer); document.documentElement.classList.toggle('voice-mode', voiceMode); $('answerInput').readOnly = voiceMode; if (voiceMode) { $('answerInput').setAttribute('inputmode', 'none'); $('answerInput').blur(); if (document.activeElement === $('answerInput')) document.body.focus(); } else $('answerInput').setAttribute('inputmode', 'text'); }
   function stopVoiceRecognition() { if (recognition) { try { recognition.abort(); } catch (error) {} recognition = null; } $('voiceBtn').classList.remove('listening'); $('voiceBtn').setAttribute('aria-pressed', 'false'); }
   function voiceError(message) { stopVoiceRecognition(); feedback(message, 'bad'); toast(message); }
   function startVoiceRecognition() {
@@ -364,6 +368,8 @@
     $('startBtn').onclick = function () { if (stopped) resumeGame(); else if (engine.running) stopGame(); else startOfflineDialog(); };
     $('resetBtn').onclick = function () { if (stopped && confirm('Durdurulan yarışma kaydedilmeden silinecek. Emin misiniz?')) resetGame(); };
     $('checkBtn').onclick = function () { act('answer'); }; $('passBtn').onclick = function () { act('pass'); };
+    function preserveKeyboardFocus(event) { if (!voiceMode && document.documentElement.classList.contains('mobile-ui') && document.activeElement === $('answerInput')) event.preventDefault(); }
+    $('checkBtn').onpointerdown = preserveKeyboardFocus; $('passBtn').onpointerdown = preserveKeyboardFocus;
     $('voiceBtn').onclick = function () { if ($('voiceBtn').classList.contains('listening')) stopVoiceRecognition(); else startVoiceRecognition(); };
     $('answerInput').onpointerdown = function () { setVoiceMode(false); };
     $('answerInput').onkeydown = function (event) { if (event.key === 'Enter') { event.preventDefault(); act('answer'); } };
@@ -381,6 +387,7 @@
     $('highContrast').onchange = function () { userSettings.highContrast = this.checked; applyUserSettings(); };
     $('reduceEffects').onchange = function () { userSettings.reduceEffects = this.checked; applyUserSettings(); };
     $('resetUserSettings').onclick = function () { userSettings = { scale: 100, voiceSensitivity: 'normal', highContrast: false, reduceEffects: false }; applyUserSettings(); toast('Kullanıcı ayarları sıfırlandı.'); };
+    window.addEventListener('resize', applyGameWorldScale);
     window.addEventListener('beforeunload', stopTimer);
   }
 

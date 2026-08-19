@@ -36,7 +36,10 @@ assert(app.includes('isPassCommand(transcript)') && app.includes("act('pass')") 
 assert(features.includes("setProperty('--ring-size'") && features.includes("classList.toggle('short-viewport'") && css.includes('.mobile-ui.landscape-ui'), 'Mobil geometri gerçek ekran ölçülerine ve yöne göre hesaplanmalı');
 assert(html.includes('id="userSettingsBtn"') && html.includes('id="uiScale"') && html.includes('id="voiceSensitivity"'), 'Kullanıcı ayar paneli, ölçek ve ses hassasiyeti kontrolleri bulunmalı');
 assert(app.includes("setAttribute('inputmode', 'none')") && app.includes('readOnly = voiceMode') && app.includes('maxAlternatives = 5'), 'Sesli mod mobil klavyeyi kilitlemeli ve alternatif ses sonuçlarını değerlendirmeli');
-assert(features.includes('getBoundingClientRect().height') && features.includes('stageBudget') && features.includes('safeAreaInsets'), 'Mobil yerleşim gerçek dikey DOM bütçesi ve güvenli alanlarla hesaplanmalı');
+assert(features.includes('offsetHeight') && features.includes('world.clientHeight') && features.includes('stageBudget') && features.includes('safeAreaInsets'), 'Mobil yerleşim ölçek öncesi gerçek dikey DOM bütçesi ve güvenli alanlarla hesaplanmalı');
 assert(css.includes('.userSettingsPanel') && css.includes('html.high-contrast') && css.includes('html.reduce-effects'), 'Kullanıcı görsel tercihleri için kalıcı panel stilleri bulunmalı');
+assert(html.includes('id="gameWorld"') && css.includes('transform:scale(var(--world-scale,1))') && css.includes('transform-origin:center top'), 'Tüm oyun dünyası tek kapsayıcıdan orantılı ölçeklenmeli');
+assert(app.includes('function applyGameWorldScale') && !app.includes("setProperty('--scaled-answer-height'") && !app.includes("setProperty('--scaled-letter-max'"), 'Slider parça boyutları yerine yalnız ana oyun kapsayıcısını ölçeklemeli');
+assert(app.includes('function restoreKeyboardFocus') && app.includes('? 75 : 0') && app.includes('keyboardTransition'), 'Klavye modu geçişte odağı koruyup 75 ms sonra yeniden odaklanmalı');
 
-console.log('24/24 arayüz, ses, ayarlar, güvenlik, yedekleme ve mobil sözleşme testi başarılı');
+console.log('27/27 arayüz, ses, ölçek, klavye, güvenlik ve mobil sözleşme testi başarılı');
