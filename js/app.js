@@ -21,6 +21,7 @@
   var adminTab = 'settings';
   var modalResolver = null;
   var recognition = null;
+  var voiceMode = false;
   var PIN_LOCK_KEY = 'tcdd_passaparola_pin_lock_v1';
 
   function $(id) { return document.getElementById(id); }
@@ -110,17 +111,25 @@
   function setControls(enabled) {
     $('answerInput').disabled = !enabled; $('checkBtn').disabled = !enabled; $('passBtn').disabled = !enabled; $('voiceBtn').disabled = !enabled;
     if (!enabled) stopVoiceRecognition();
-    if (enabled) { $('answerInput').value = ''; $('answerInput').focus({ preventScroll: true }); }
+    if (enabled) { $('answerInput').value = ''; if (!voiceMode && !document.documentElement.classList.contains('mobile-ui')) $('answerInput').focus({ preventScroll: true }); }
   }
+  function speechNormalize(value) { return String(value || '').toLocaleLowerCase('tr-TR').replace(/ı/g, 'i').replace(/ğ/g, 'g').replace(/ü/g, 'u').replace(/ş/g, 's').replace(/ö/g, 'o').replace(/ç/g, 'c').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim(); }
+  function editSimilarity(left, right) { if (left === right) return 1; if (!left.length || !right.length) return 0; var previous = Array.from({ length: right.length + 1 }, function (_, index) { return index; }); for (var i = 1; i <= left.length; i += 1) { var current = [i]; for (var j = 1; j <= right.length; j += 1) current[j] = Math.min(current[j - 1] + 1, previous[j] + 1, previous[j - 1] + (left[i - 1] === right[j - 1] ? 0 : 1)); previous = current; } return 1 - previous[right.length] / Math.max(left.length, right.length); }
+  function bigrams(value) { var compact = value.replace(/\s/g, ''); if (compact.length < 2) return compact ? [compact] : []; var result = []; for (var i = 0; i < compact.length - 1; i += 1) result.push(compact.slice(i, i + 2)); return result; }
+  function diceSimilarity(left, right) { var a = bigrams(left), b = bigrams(right), used = {}, matches = 0; a.forEach(function (pair) { var index = b.findIndex(function (candidate, candidateIndex) { return candidate === pair && !used[candidateIndex]; }); if (index >= 0) { used[index] = true; matches += 1; } }); return a.length + b.length ? 2 * matches / (a.length + b.length) : 0; }
+  function syllableShape(value) { return value.replace(/[aeiou]/g, 'V').replace(/V+/g, 'V').replace(/\s/g, ''); }
+  function pronunciationScore(spoken, expected) { var left = speechNormalize(spoken), right = speechNormalize(expected); if (!left || !right) return 0; var maxLength = Math.max(left.length, right.length); if (Math.abs(left.length - right.length) > Math.max(2, Math.ceil(maxLength * .38))) return 0; return editSimilarity(left, right) * .55 + diceSimilarity(left, right) * .3 + editSimilarity(syllableShape(left), syllableShape(right)) * .15; }
+  function tolerantVoiceAnswer(transcript) { var question = engine.current, best = null; if (!question) return null; question.acceptedAnswers.forEach(function (answer) { var score = pronunciationScore(transcript, answer); if (!best || score > best.score) best = { answer: answer, score: score }; }); var length = speechNormalize(transcript).length, threshold = length <= 3 ? .78 : length <= 5 ? .7 : .64; return best && best.score >= threshold ? best : null; }
+  function isPassCommand(transcript) { return /^pas(?:\s+gec(?:iyorum|elim|in)?)?$/.test(speechNormalize(transcript)); }
   function stopVoiceRecognition() { if (recognition) { try { recognition.abort(); } catch (error) {} recognition = null; } $('voiceBtn').classList.remove('listening'); $('voiceBtn').setAttribute('aria-pressed', 'false'); }
   function voiceError(message) { stopVoiceRecognition(); feedback(message, 'bad'); toast(message); }
   function startVoiceRecognition() {
     if ($('voiceBtn').disabled || locked || stopped) return;
     var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) { voiceError('Bu tarayıcı sesli cevap özelliğini desteklemiyor.'); return; }
-    stopVoiceRecognition(); recognition = new SpeechRecognition(); recognition.lang = 'tr-TR'; recognition.interimResults = false; recognition.maxAlternatives = 1; recognition.continuous = false;
+    voiceMode = true; $('answerInput').blur(); document.documentElement.classList.add('voice-mode'); stopVoiceRecognition(); recognition = new SpeechRecognition(); recognition.lang = 'tr-TR'; recognition.interimResults = false; recognition.maxAlternatives = 1; recognition.continuous = false;
     recognition.onstart = function () { $('voiceBtn').classList.add('listening'); $('voiceBtn').setAttribute('aria-pressed', 'true'); feedback('DİNLENİYOR… Cevabınızı söyleyin.', 'voiceFeedback'); };
-    recognition.onresult = function (event) { var transcript = event.results && event.results[0] && event.results[0][0] && event.results[0][0].transcript; stopVoiceRecognition(); if (!transcript) { voiceError('Ses anlaşılamadı. Lütfen tekrar deneyin.'); return; } $('answerInput').value = transcript.trim(); feedback('Sesli cevap alındı.', 'ok'); setTimeout(function () { act('answer'); }, 180); };
+    recognition.onresult = function (event) { var transcript = event.results && event.results[0] && event.results[0][0] && event.results[0][0].transcript; stopVoiceRecognition(); if (!transcript) { voiceError('Ses anlaşılamadı. Lütfen tekrar deneyin.'); return; } if (isPassCommand(transcript)) { feedback('SESLİ PAS KOMUTU ALINDI', 'passFeedback'); setTimeout(function () { act('pass'); }, 120); return; } var match = tolerantVoiceAnswer(transcript); $('answerInput').value = match ? match.answer : transcript.trim(); feedback(match ? 'TELAFFUZ EŞLEŞTİ · %' + Math.round(match.score * 100) : 'Sesli cevap alındı.', match ? 'ok' : 'voiceFeedback'); setTimeout(function () { act('answer'); }, 180); };
     recognition.onerror = function (event) { var messages = { 'not-allowed': 'Mikrofon izni verilmedi. Tarayıcı ayarlarından mikrofonu açın.', 'service-not-allowed': 'Ses tanıma hizmetine erişilemiyor.', 'no-speech': 'Ses algılanamadı. Mikrofona daha yakın konuşun.', 'audio-capture': 'Kullanılabilir bir mikrofon bulunamadı.', network: 'Ses tanıma için ağ bağlantısı kurulamadı.' }; voiceError(messages[event.error] || 'Sesli cevap alınamadı. Lütfen tekrar deneyin.'); };
     recognition.onend = function () { if (recognition) stopVoiceRecognition(); };
     try { recognition.start(); } catch (error) { voiceError('Mikrofon başlatılamadı. Lütfen tekrar deneyin.'); }
@@ -342,6 +351,7 @@
     $('resetBtn').onclick = function () { if (stopped && confirm('Durdurulan yarışma kaydedilmeden silinecek. Emin misiniz?')) resetGame(); };
     $('checkBtn').onclick = function () { act('answer'); }; $('passBtn').onclick = function () { act('pass'); };
     $('voiceBtn').onclick = function () { if ($('voiceBtn').classList.contains('listening')) stopVoiceRecognition(); else startVoiceRecognition(); };
+    $('answerInput').onpointerdown = function () { voiceMode = false; document.documentElement.classList.remove('voice-mode'); };
     $('answerInput').onkeydown = function (event) { if (event.key === 'Enter') { event.preventDefault(); act('answer'); } };
     $('homeAdminBtn').onclick = requestAdmin;
     $('fullBtn').onclick = function () { if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(function () { toast('Tam ekran kullanılamıyor.'); }); else toast('Tam ekran desteklenmiyor.'); };
@@ -366,5 +376,5 @@
     },
     toast: toast, format: format, snapshot: snapshot, resetGame: resetGame, downloadBackup: downloadBackup, showBackupReport: backupReport
   };
-  window.PassaparolaAppTest = { resetGame: resetGame };
+  window.PassaparolaAppTest = { resetGame: resetGame, speechNormalize: speechNormalize, pronunciationScore: pronunciationScore, tolerantVoiceAnswer: tolerantVoiceAnswer, isPassCommand: isPassCommand };
 })();

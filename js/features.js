@@ -31,10 +31,12 @@
     updateViewport();
   }
   function updateViewport() {
-    var height = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-    document.documentElement.style.setProperty('--app-height', Math.round(height) + 'px');
+    var viewport = window.visualViewport; var height = viewport ? viewport.height : window.innerHeight; var width = viewport ? viewport.width : window.innerWidth;
+    var root = document.documentElement; var portrait = height >= width; var ringSize = portrait ? Math.min(width * .76, height * .38, Math.max(168, height - 355), 350) : Math.min(height * .72, width * .42, 340);
+    root.style.setProperty('--app-height', Math.round(height) + 'px'); root.style.setProperty('--app-width', Math.round(width) + 'px'); root.style.setProperty('--screen-ratio', (width / Math.max(1, height)).toFixed(4)); root.style.setProperty('--ring-size', Math.max(150, Math.round(ringSize)) + 'px'); root.style.setProperty('--ring-zone', Math.max(160, Math.round(ringSize + 8)) + 'px');
+    root.classList.toggle('landscape-ui', width > height); root.classList.toggle('short-viewport', height < 650); root.classList.toggle('very-short-viewport', height < 540); root.classList.toggle('narrow-viewport', width < 360); root.classList.toggle('tall-viewport', height >= 800);
     var keyboardOpen = window.visualViewport && window.visualViewport.height < window.innerHeight * 0.76;
-    document.documentElement.classList.toggle('keyboard-open', Boolean(keyboardOpen));
+    root.classList.toggle('keyboard-open', Boolean(keyboardOpen) && !root.classList.contains('voice-mode'));
   }
   function finishSplash() {
     setTimeout(function () {
@@ -221,7 +223,7 @@
   function showOnlineLeaders() { window.PassaparolaApp.showOnlineLeaderboard(roomCode, latestPlayers); }
 
   function init() {
-    detectDevice(); window.addEventListener('resize', detectDevice);
+    detectDevice(); window.addEventListener('resize', detectDevice); window.addEventListener('orientationchange', function () { setTimeout(detectDevice, 120); });
     if (window.visualViewport) { window.visualViewport.addEventListener('resize', updateViewport); window.visualViewport.addEventListener('scroll', updateViewport); }
     finishSplash(); installSupport();
     $('offlineMode').onclick = function () { window.PassaparolaApp.enterOffline(); };

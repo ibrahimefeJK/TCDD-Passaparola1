@@ -30,5 +30,9 @@ assert(html.includes('id="voiceBtn"') && app.includes("recognition.lang = 'tr-TR
 assert(app.includes('tcdd_passaparola_pin_lock_v1') && app.includes('15 * 60 * 1000') && !app.includes("entered === String(data.settings.adminPin"), 'PIN kilidi kalıcı olmalı ve düz metin doğrulama yapılmamalı');
 assert(html.includes('id="teacherExport"') && app.includes("backupType: 'tcdd-passaparola-room'") && features.includes('showBackupReport'), 'Oda yedeği ve salt okunur rapor akışı bulunmalı');
 assert(features.includes('firebaseState.api.remove(roomRef)') && css.includes('.voiceBtn.listening'), 'Canlı oda temizliği ve mikrofon pulse geri bildirimi bulunmalı');
+assert(app.includes('function pronunciationScore') && app.includes('editSimilarity') && app.includes('diceSimilarity') && app.includes('syllableShape'), 'Telaffuz toleransı çoklu matematiksel benzerlik ölçüleri kullanmalı');
+assert(app.includes("replace(/ı/g, 'i')") && app.includes("replace(/ş/g, 's')") && app.includes("toLocaleLowerCase('tr-TR')"), 'Türkçe sesli cevaplar karşılaştırma öncesinde normalize edilmeli');
+assert(app.includes('isPassCommand(transcript)') && app.includes("act('pass')") && app.includes('voiceMode = true'), 'Sesli pas komutu ve kalıcı sesli oyun modu bulunmalı');
+assert(features.includes("setProperty('--ring-size'") && features.includes("classList.toggle('short-viewport'") && css.includes('.mobile-ui.landscape-ui'), 'Mobil geometri gerçek ekran ölçülerine ve yöne göre hesaplanmalı');
 
-console.log('16/16 arayüz, güvenlik, yedekleme ve online sözleşme testi başarılı');
+console.log('20/20 arayüz, ses, güvenlik, yedekleme ve mobil sözleşme testi başarılı');
